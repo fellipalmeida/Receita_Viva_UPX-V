@@ -44,5 +44,8 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Chaves de API — não commitar
+# Chaves de API
 lib/config.dart
+
+# Design
+design_handoff_receita_viva/
