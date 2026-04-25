@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../theme/app_theme.dart';
-import '../models/recipe.dart';
-import '../services/storage_service.dart';
-import '../data/mock_data.dart';
-import 'recipe_screen.dart';
-import 'publish_screen.dart';
+import '../tema/tema_app.dart';
+import '../modelos/receita.dart';
+import '../servicos/servico_armazenamento.dart';
+import '../dados/dados_mock.dart';
+import 'tela_receita.dart';
+import 'tela_publicar.dart';
 
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
@@ -82,8 +82,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 color: AppColors.primary,
                 child: CustomScrollView(
                   slivers: [
-                    // Header
-                    SliverToBoxAdapter(
+                                        SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
                         child: Row(
@@ -120,16 +119,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
                         ),
                       ),
                     ),
-                    // Stories
-                    SliverToBoxAdapter(
+                                        SliverToBoxAdapter(
                       child: SizedBox(
                         height: 80,
                         child: ListView(
                           scrollDirection: Axis.horizontal,
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           children: [
-                            // Seu avatar
-                            _StoryItem(name: 'Você', emoji: '➕', isYou: true, onTap: _openPublish),
+                                                        _StoryItem(name: 'Você', emoji: '➕', isYou: true, onTap: _openPublish),
                             const SizedBox(width: 12),
                             ...mockStories.map((s) => Padding(
                                   padding: const EdgeInsets.only(right: 12),
@@ -145,8 +142,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       ),
                     ),
                     const SliverToBoxAdapter(child: SizedBox(height: 8)),
-                    // Feed mock
-                    SliverList(
+                                        SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (_, i) {
                           if (i < mockCommunityPosts.length) {
@@ -167,8 +163,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                               hexToColor: _hexToColor,
                             );
                           }
-                          // Posts de usuários
-                          final recipe = _userPosts[i - mockCommunityPosts.length];
+                                                    final recipe = _userPosts[i - mockCommunityPosts.length];
                           final liked = _likedPosts.contains(recipe.id);
                           return _PostCard(
                             user: recipe.author ?? 'Você',

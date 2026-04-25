@@ -1,13 +1,13 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'theme/app_theme.dart';
-import 'services/storage_service.dart';
-import 'screens/onboarding_screen.dart';
-import 'screens/home_screen.dart';
-import 'screens/search_screen.dart';
-import 'screens/chat_screen.dart';
-import 'screens/community_screen.dart';
-import 'screens/profile_screen.dart';
+import 'tema/tema_app.dart';
+import 'servicos/servico_armazenamento.dart';
+import 'telas/tela_onboarding.dart';
+import 'telas/tela_inicio.dart';
+import 'telas/tela_busca.dart';
+import 'telas/tela_chat.dart';
+import 'telas/tela_comunidade.dart';
+import 'telas/tela_perfil.dart';
 
 void main() {
   runApp(const ReceitaVivaApp());

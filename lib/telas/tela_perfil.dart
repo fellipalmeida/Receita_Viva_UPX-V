@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../theme/app_theme.dart';
-import '../models/recipe.dart';
-import '../services/storage_service.dart';
-import 'recipe_screen.dart';
-import 'favorites_screen.dart';
-import 'history_screen.dart';
+import '../tema/tema_app.dart';
+import '../modelos/receita.dart';
+import '../servicos/servico_armazenamento.dart';
+import 'tela_receita.dart';
+import 'tela_favoritos.dart';
+import 'tela_historico.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -75,8 +75,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // Hero
-              Stack(
+                            Stack(
                 clipBehavior: Clip.none,
                 alignment: Alignment.bottomCenter,
                 children: [

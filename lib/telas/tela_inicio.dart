@@ -1,12 +1,12 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../theme/app_theme.dart';
-import '../models/recipe.dart';
-import '../data/mock_data.dart';
-import '../services/storage_service.dart';
-import 'recipe_screen.dart';
-import 'search_screen.dart';
-import 'notifications_screen.dart';
+import '../tema/tema_app.dart';
+import '../modelos/receita.dart';
+import '../dados/dados_mock.dart';
+import '../servicos/servico_armazenamento.dart';
+import 'tela_receita.dart';
+import 'tela_busca.dart';
+import 'tela_notificacoes.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -62,8 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
-            // Header
-            SliverToBoxAdapter(
+                        SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                 child: Row(

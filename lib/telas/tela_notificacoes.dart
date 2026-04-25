@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../theme/app_theme.dart';
-import '../data/mock_data.dart';
+import '../tema/tema_app.dart';
+import '../dados/dados_mock.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});

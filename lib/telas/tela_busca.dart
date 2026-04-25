@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../theme/app_theme.dart';
-import '../models/recipe.dart';
-import '../data/mock_data.dart';
-import 'recipe_screen.dart';
+import '../tema/tema_app.dart';
+import '../modelos/receita.dart';
+import '../dados/dados_mock.dart';
+import 'tela_receita.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -55,8 +55,7 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
-            Padding(
+                        Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

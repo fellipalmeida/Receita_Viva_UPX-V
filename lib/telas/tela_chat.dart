@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../theme/app_theme.dart';
-import '../models/recipe.dart';
-import '../services/gemini_service.dart';
-import '../services/storage_service.dart';
+import '../tema/tema_app.dart';
+import '../modelos/receita.dart';
+import '../servicos/servico_gemini.dart';
+import '../servicos/servico_armazenamento.dart';
 import '../config.dart';
-import 'recipe_screen.dart';
+import 'tela_receita.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -155,8 +155,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
-            Container(
+                        Container(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
               decoration: const BoxDecoration(
                 color: AppColors.cardBg,
@@ -577,8 +576,7 @@ class _RecipeBubbleState extends State<_RecipeBubble> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Hero
-              ClipRRect(
+                            ClipRRect(
                 borderRadius: const BorderRadius.only(
                   topRight: Radius.circular(18),
                   topLeft: Radius.circular(4),

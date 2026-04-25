@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../theme/app_theme.dart';
-import '../models/user_profile.dart';
-import '../services/storage_service.dart';
+import '../tema/tema_app.dart';
+import '../modelos/perfil_usuario.dart';
+import '../servicos/servico_armazenamento.dart';
 import '../main.dart';
-import 'cadastro_screen.dart';
+import 'tela_cadastro.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -53,8 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Stack(
           children: [
-            // Decorative blobs
-            Positioned(
+                        Positioned(
               top: -60, left: -40,
               child: Container(
                 width: 200, height: 200,
@@ -79,8 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 children: [
                   const SizedBox(height: 60),
-                  // Logo
-                  Row(
+                                    Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
@@ -127,8 +125,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textMuted),
                   ),
                   const SizedBox(height: 40),
-                  // Campos
-                  _InputField(
+                                    _InputField(
                     controller: _emailCtrl,
                     placeholder: 'E-mail',
                     icon: Icons.email_outlined,
@@ -163,8 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16),
                   _GradientButton(label: 'Entrar', onTap: _enter),
                   const SizedBox(height: 20),
-                  // Divisor
-                  Row(children: [
+                                    Row(children: [
                     const Expanded(child: Divider(color: AppColors.border, thickness: 1)),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),

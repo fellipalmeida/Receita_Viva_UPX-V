@@ -1,7 +1,7 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../config.dart';
-import '../models/recipe.dart';
+import '../modelos/receita.dart';
 
 class GeminiService {
   late final GenerativeModel _model;

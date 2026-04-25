@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../models/recipe.dart';
-import '../services/storage_service.dart';
-import '../theme/app_theme.dart';
-import 'recipe_screen.dart';
+import '../modelos/receita.dart';
+import '../servicos/servico_armazenamento.dart';
+import '../tema/tema_app.dart';
+import 'tela_receita.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -127,8 +127,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Widget _buildList() {
-    // Agrupado por data
-    final Map<String, List<Recipe>> grouped = {};
+        final Map<String, List<Recipe>> grouped = {};
     for (final r in _history) {
       final key = _formatDate(r.createdAt);
       grouped.putIfAbsent(key, () => []).add(r);

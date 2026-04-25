@@ -1,6 +1,6 @@
-import 'package:shared_preferences/shared_preferences.dart';
-import '../models/recipe.dart';
-import '../models/user_profile.dart';
+﻿import 'package:shared_preferences/shared_preferences.dart';
+import '../modelos/receita.dart';
+import '../modelos/perfil_usuario.dart';
 
 class StorageService {
   static const _favoritesKey = 'favorites';

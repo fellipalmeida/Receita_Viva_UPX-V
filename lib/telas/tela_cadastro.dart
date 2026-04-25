@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../models/user_profile.dart';
-import '../services/storage_service.dart';
-import '../theme/app_theme.dart';
+import '../modelos/perfil_usuario.dart';
+import '../servicos/servico_armazenamento.dart';
+import '../tema/tema_app.dart';
 import '../main.dart';
 
 class CadastroScreen extends StatefulWidget {
@@ -15,19 +15,16 @@ class CadastroScreen extends StatefulWidget {
 class _CadastroScreenState extends State<CadastroScreen> {
   int _step = 0;
 
-  // Step 0
-  final _nameCtrl = TextEditingController();
+    final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   bool _termos = false;
 
-  // Step 1
-  final _passwordCtrl = TextEditingController();
+    final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   bool _showPass = false;
   bool _showConfirm = false;
 
-  // Step 2
-  final List<String> _alergias = [];
+    final List<String> _alergias = [];
   final List<String> _dietas = [];
   final List<String> _cozinhas = [];
 
@@ -171,8 +168,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Barra de progresso
-                  Row(
+                                    Row(
                     children: List.generate(4, (i) => Expanded(
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
@@ -208,8 +204,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
               ),
             ),
           ),
-          // Botões inferiores
-          Padding(
+                    Padding(
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
             child: Column(
               children: [

@@ -1,4 +1,4 @@
-import '../models/recipe.dart';
+﻿import '../modelos/receita.dart';
 
 final List<Recipe> mockRecipes = [
   Recipe(

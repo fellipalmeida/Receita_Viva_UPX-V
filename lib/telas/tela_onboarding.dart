@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../theme/app_theme.dart';
-import '../services/storage_service.dart';
-import 'login_screen.dart';
+import '../tema/tema_app.dart';
+import '../servicos/servico_armazenamento.dart';
+import 'tela_login.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -89,8 +89,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               ),
             ),
-            // Conteúdo
-            Column(
+                        Column(
               children: [
                 // Botão pular
                 Align(

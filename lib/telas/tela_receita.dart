@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../models/recipe.dart';
-import '../services/storage_service.dart';
-import '../theme/app_theme.dart';
-import 'publish_screen.dart';
+import '../modelos/receita.dart';
+import '../servicos/servico_armazenamento.dart';
+import '../tema/tema_app.dart';
+import 'tela_publicar.dart';
 
 class RecipeScreen extends StatefulWidget {
   final Recipe recipe;
@@ -17,8 +17,7 @@ class RecipeScreen extends StatefulWidget {
 class _RecipeScreenState extends State<RecipeScreen> {
   final _storage = StorageService();
   bool _isFavorite = false;
-  bool _tab = true; // true = ingredientes, false = modo de preparo
-
+  bool _tab = true; 
   @override
   void initState() {
     super.initState();
@@ -66,8 +65,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
       backgroundColor: AppColors.bg,
       body: CustomScrollView(
         slivers: [
-          // Hero
-          SliverToBoxAdapter(
+                    SliverToBoxAdapter(
             child: Stack(
               children: [
                 Container(
@@ -86,8 +84,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                     child: Text(recipe.emoji, style: const TextStyle(fontSize: 100)),
                   ),
                 ),
-                // overlay gradiente bottom
-                Positioned(
+                                Positioned(
                   bottom: 0, left: 0, right: 0,
                   child: Container(
                     height: 80,
@@ -100,8 +97,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                     ),
                   ),
                 ),
-                // Botão voltar
-                Positioned(
+                                Positioned(
                   top: MediaQuery.of(context).padding.top + 8,
                   left: 16,
                   child: _HeroButton(
@@ -109,8 +105,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                     child: const Icon(Icons.arrow_back, size: 18, color: Color(0xFF333333)),
                   ),
                 ),
-                // Botão favoritar
-                Positioned(
+                                Positioned(
                   top: MediaQuery.of(context).padding.top + 8,
                   right: 16,
                   child: _HeroButton(
@@ -122,8 +117,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                     ),
                   ),
                 ),
-                // Botão publicar
-                Positioned(
+                                Positioned(
                   top: MediaQuery.of(context).padding.top + 8,
                   right: 64,
                   child: _HeroButton(
@@ -139,13 +133,11 @@ class _RecipeScreenState extends State<RecipeScreen> {
               ],
             ),
           ),
-          // Conteúdo
-          SliverPadding(
+                    SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                // Título
-                Text(
+                                Text(
                   recipe.title,
                   style: GoogleFonts.poppins(
                     fontSize: 20,
@@ -154,8 +146,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                // Info row
-                Container(
+                                Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: AppColors.cardBg,
@@ -178,8 +169,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                 ),
                 const SizedBox(height: 16),
                 if (hasStructured) ...[
-                  // Tab selector
-                  Container(
+                                    Container(
                     padding: const EdgeInsets.all(3),
                     decoration: BoxDecoration(
                       color: AppColors.chipBg,
