@@ -1,4 +1,5 @@
-﻿import 'package:shared_preferences/shared_preferences.dart';
+﻿import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../modelos/receita.dart';
 import '../modelos/perfil_usuario.dart';
 
@@ -10,6 +11,8 @@ class StorageService {
   static const _likedPostsKey = 'liked_posts';
   static const _onboardingKey = 'onboarding_done';
   static const _notifCountKey = 'notif_unread_count';
+  static const _passwordKey = 'user_password';
+  static const _realNotificationsKey = 'real_notifications';
 
   // ── Onboarding ─────────────────────────────────────────────
   Future<bool> isOnboardingDone() async {
@@ -125,14 +128,57 @@ class StorageService {
     await prefs.setStringList(_likedPostsKey, liked.toList());
   }
 
+  // ── Password ───────────────────────────────────────────────
+  Future<void> savePassword(String password) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_passwordKey, password);
+  }
+
+  Future<String?> getPassword() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_passwordKey);
+  }
+
   // ── Notifications ──────────────────────────────────────────
   Future<int> getUnreadNotifCount() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(_notifCountKey) ?? 3;
+    return prefs.getInt(_notifCountKey) ?? 0;
   }
 
   Future<void> clearNotifCount() async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_notifCountKey, 0);
+    final list = prefs.getStringList(_realNotificationsKey) ?? [];
+    final updated = list.map((s) {
+      final m = Map<String, dynamic>.from(jsonDecode(s) as Map);
+      m['unread'] = false;
+      return jsonEncode(m);
+    }).toList();
+    await prefs.setStringList(_realNotificationsKey, updated);
+  }
+
+  Future<void> addNotification({required String icon, required String text}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_realNotificationsKey) ?? [];
+    final notif = jsonEncode({'icon': icon, 'text': text, 'time': 'Agora', 'unread': true});
+    list.insert(0, notif);
+    if (list.length > 20) list.removeLast();
+    await prefs.setStringList(_realNotificationsKey, list);
+    final count = prefs.getInt(_notifCountKey) ?? 0;
+    await prefs.setInt(_notifCountKey, count + 1);
+  }
+
+  Future<List<Map<String, dynamic>>> getRealNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_realNotificationsKey) ?? [];
+    return list
+        .map((s) => Map<String, dynamic>.from(jsonDecode(s) as Map))
+        .toList();
+  }
+
+  Future<void> clearAllNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_realNotificationsKey);
     await prefs.setInt(_notifCountKey, 0);
   }
 }

@@ -67,6 +67,10 @@ class _PublishScreenState extends State<PublishScreen> {
         steps: base?.steps ?? [],
       );
       await _storage.publishRecipe(recipe);
+      await _storage.addNotification(
+        icon: '🍳',
+        text: 'Receita "${recipe.title}" publicada na comunidade!',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -97,7 +101,6 @@ class _PublishScreenState extends State<PublishScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
       appBar: AppBar(title: const Text('Publicar Receita')),
       body: Form(
         key: _formKey,

@@ -1,12 +1,13 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../tema/tema_app.dart';
 import '../modelos/receita.dart';
 import '../dados/dados_mock.dart';
 import '../servicos/servico_armazenamento.dart';
 import 'tela_receita.dart';
-import 'tela_busca.dart';
 import 'tela_notificacoes.dart';
+import '../main.dart';
+import '../widgets/food_image.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,9 +18,11 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _storage = StorageService();
+  final _searchCtrl = TextEditingController();
   String _selectedCategory = 'all';
   String _userName = 'Chef';
   int _notifCount = 3;
+  Recipe? _featuredRecipe;
 
   @override
   void initState() {
@@ -27,16 +30,34 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadProfile();
   }
 
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _search(String query) {
+    final q = query.trim();
+    if (q.isEmpty) return;
+    _searchCtrl.clear();
+    searchNotifier.value = q;
+    tabNotifier.value = 5;
+  }
+
   Future<void> _loadProfile() async {
     final profile = await _storage.getProfile();
     final count = await _storage.getUnreadNotifCount();
+    final history = await _storage.getHistory();
     if (mounted) {
       setState(() {
         _userName = profile?.name ?? 'Chef';
         _notifCount = count;
+        _featuredRecipe = history.isNotEmpty ? history.first : null;
       });
     }
   }
+
+  Recipe get _featured => _featuredRecipe ?? mockRecipes[2];
 
   List<Recipe> get _filtered {
     if (_selectedCategory == 'all') return mockRecipes;
@@ -50,19 +71,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Color _hexToColor(String hex) {
-    final h = hex.replaceAll('#', '');
-    return Color(int.parse('FF$h', radix: 16));
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
-                        SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                 child: Row(
@@ -76,7 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             'Olá, $_userName! 👋',
                             style: GoogleFonts.poppins(
                               fontSize: 12,
-                              color: AppColors.textMuted,
+                              color: context.mutedColor,
                             ),
                           ),
                           Text(
@@ -84,7 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             style: GoogleFonts.poppins(
                               fontSize: 20,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.text,
+                              color: context.textColor,
                             ),
                           ),
                         ],
@@ -107,10 +122,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           },
                           child: Container(
                             width: 40, height: 40,
-                            decoration: const BoxDecoration(
-                              color: AppColors.cardBg,
+                            decoration: BoxDecoration(
+                              color: context.cardColor,
                               shape: BoxShape.circle,
-                              boxShadow: [
+                              boxShadow: const [
                                 BoxShadow(
                                   color: Color(0x1AD4623A),
                                   blurRadius: 12,
@@ -118,7 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ],
                             ),
-                            child: const Icon(Icons.notifications_none, size: 22, color: AppColors.text),
+                            child: Icon(Icons.notifications_none, size: 22, color: context.textColor),
                           ),
                         ),
                         if (_notifCount > 0)
@@ -151,30 +166,38 @@ class _HomeScreenState extends State<HomeScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                child: GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SearchScreen()),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: context.cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: const [
+                      BoxShadow(color: Color(0x1AD4623A), blurRadius: 12, offset: Offset(0, 2)),
+                    ],
                   ),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.cardBg,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: const [
-                        BoxShadow(color: Color(0x1AD4623A), blurRadius: 12, offset: Offset(0, 2)),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.search, size: 18, color: AppColors.textMuted),
-                        const SizedBox(width: 10),
-                        Text(
-                          'Buscar receitas, ingredientes...',
-                          style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textMuted),
+                  child: Row(
+                    children: [
+                      Icon(Icons.search, size: 18, color: context.mutedColor),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: _searchCtrl,
+                          style: GoogleFonts.poppins(fontSize: 13, color: context.textColor),
+                          textInputAction: TextInputAction.search,
+                          decoration: InputDecoration(
+                            hintText: 'Buscar receitas e ingredientes...',
+                            hintStyle: GoogleFonts.poppins(fontSize: 13, color: context.mutedColor),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            filled: false,
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          onSubmitted: _search,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -191,33 +214,21 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: GoogleFonts.poppins(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.text,
+                        color: context.textColor,
                       ),
                     ),
                     const SizedBox(height: 12),
                     GestureDetector(
-                      onTap: () => _openRecipe(mockRecipes[2]),
+                      onTap: () => _openRecipe(_featured),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(20),
                         child: Stack(
                           children: [
-                            Container(
+                            FoodImage(
+                              recipe: _featured,
+                              width: double.infinity,
                               height: 160,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    _hexToColor(mockRecipes[2].colorStart),
-                                    _hexToColor(mockRecipes[2].colorEnd),
-                                  ],
-                                ),
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                mockRecipes[2].emoji,
-                                style: const TextStyle(fontSize: 80),
-                              ),
+                              emojiFontSize: 80,
                             ),
                             // overlay bottom
                             Positioned(
@@ -235,7 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      mockRecipes[2].title,
+                                      _featured.title,
                                       style: GoogleFonts.poppins(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w700,
@@ -243,7 +254,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                     ),
                                     Text(
-                                      '⏱ ${mockRecipes[2].time}  ·  👤 ${mockRecipes[2].servings}  ·  ⭐ ${mockRecipes[2].rating}',
+                                      '⏱ ${_featured.time}  ·  👤 ${_featured.servings}  ·  ⭐ ${_featured.rating}',
                                       style: GoogleFonts.poppins(
                                         fontSize: 12,
                                         color: Colors.white70,
@@ -263,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
-                                  'DESTAQUE',
+                                  _featuredRecipe != null ? 'IA 🤖' : 'DESTAQUE',
                                   style: GoogleFonts.poppins(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w700,
@@ -292,7 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: GoogleFonts.poppins(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.text,
+                        color: context.textColor,
                       ),
                     ),
                   ),
@@ -312,7 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             duration: const Duration(milliseconds: 200),
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                             decoration: BoxDecoration(
-                              color: active ? AppColors.primary : AppColors.chipBg,
+                              color: active ? AppColors.primary : context.chipColor,
                               borderRadius: BorderRadius.circular(100),
                               boxShadow: active
                                   ? const [
@@ -334,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   style: GoogleFonts.poppins(
                                     fontSize: 12,
                                     fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                                    color: active ? Colors.white : AppColors.text,
+                                    color: active ? Colors.white : context.textColor,
                                   ),
                                 ),
                               ],
@@ -359,7 +370,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: GoogleFonts.poppins(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.text,
+                        color: context.textColor,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -369,7 +380,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           padding: const EdgeInsets.only(top: 20),
                           child: Text(
                             'Nenhuma receita nessa categoria ainda.',
-                            style: GoogleFonts.poppins(color: AppColors.textMuted, fontSize: 13),
+                            style: GoogleFonts.poppins(color: context.mutedColor, fontSize: 13),
                           ),
                         ),
                       )
@@ -408,11 +419,6 @@ class _RecipeCard extends StatelessWidget {
 
   const _RecipeCard({required this.recipe, required this.width, required this.onTap});
 
-  Color _hexToColor(String hex) {
-    final h = hex.replaceAll('#', '');
-    return Color(int.parse('FF$h', radix: 16));
-  }
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -420,7 +426,7 @@ class _RecipeCard extends StatelessWidget {
       child: Container(
         width: width,
         decoration: BoxDecoration(
-          color: AppColors.cardBg,
+          color: context.cardColor,
           borderRadius: BorderRadius.circular(16),
           boxShadow: const [
             BoxShadow(color: Color(0x1AD4623A), blurRadius: 12, offset: Offset(0, 2)),
@@ -430,34 +436,11 @@ class _RecipeCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Imagem
-            ClipRRect(
+            FoodImage(
+              recipe: recipe,
+              width: double.infinity,
+              height: 130,
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              child: Container(
-                height: 130,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      _hexToColor(recipe.colorStart),
-                      _hexToColor(recipe.colorEnd),
-                    ],
-                  ),
-                ),
-                child: Center(
-                  child: Container(
-                    width: 72, height: 72,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Text(recipe.emoji, style: const TextStyle(fontSize: 38)),
-                    ),
-                  ),
-                ),
-              ),
             ),
             // Info
             Padding(
@@ -472,21 +455,27 @@ class _RecipeCard extends StatelessWidget {
                     style: GoogleFonts.poppins(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.text,
+                      color: context.textColor,
                       height: 1.3,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Text(
-                        '⏱ ${recipe.time}',
-                        style: GoogleFonts.poppins(fontSize: 10, color: AppColors.textMuted),
+                      Flexible(
+                        child: Text(
+                          '⏱ ${recipe.time}',
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(fontSize: 10, color: context.mutedColor),
+                        ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        '👤 ${recipe.servings}',
-                        style: GoogleFonts.poppins(fontSize: 10, color: AppColors.textMuted),
+                      Flexible(
+                        child: Text(
+                          '👤 ${recipe.servings}',
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(fontSize: 10, color: context.mutedColor),
+                        ),
                       ),
                     ],
                   ),

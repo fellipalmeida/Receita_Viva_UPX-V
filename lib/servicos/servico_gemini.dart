@@ -2,6 +2,7 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../config.dart';
 import '../modelos/receita.dart';
+import 'servico_imagem.dart';
 
 class GeminiService {
   late final GenerativeModel _model;
@@ -25,17 +26,31 @@ class GeminiService {
     }
   }
 
-  Future<Recipe> generateRecipe(String query, {bool isIngredients = false}) async {
+  Future<Recipe> generateRecipe(
+    String query, {
+    bool isIngredients = false,
+    List<String> alergias = const [],
+    List<String> dietas = const [],
+  }) async {
     final topic = isIngredients
         ? 'usando os ingredientes: $query'
         : 'de: $query';
 
+    final restricoes = StringBuffer();
+    if (alergias.isNotEmpty) {
+      restricoes.writeln('\nRESTRIÇÕES OBRIGATÓRIAS: NÃO use nem mencione: ${alergias.join(', ')}. O usuário tem alergia a esses itens.');
+    }
+    if (dietas.isNotEmpty) {
+      restricoes.writeln('DIETA DO USUÁRIO: ${dietas.join(', ')}. Adapte todos os ingredientes e preparo.');
+    }
+
     final prompt = '''Você é um Chef de Cozinha especialista em culinária brasileira e internacional.
-Crie uma receita completa em Português Brasileiro $topic.
+Crie uma receita completa em Português Brasileiro $topic.${restricoes.isNotEmpty ? '\n${restricoes.toString().trim()}' : ''}
 
 Responda SOMENTE com JSON válido, sem texto extra, markdown ou explicações:
 {
-  "title": "Nome da Receita",
+  "title": "Nome da Receita em Português",
+  "title_en": "Dish Name in English",
   "time": "X min",
   "servings": "X porções",
   "difficulty": "Fácil",
@@ -55,9 +70,16 @@ Inclua pelo menos 4 ingredientes e 3 passos.''';
       final jsonStr = _extractJson(text);
       final data = jsonDecode(jsonStr) as Map<String, dynamic>;
       final colors = _categoryColors(data['category'] as String? ?? 'Outros');
+      final id = DateTime.now().millisecondsSinceEpoch.toString();
+      final title = data['title'] as String? ?? (isIngredients ? 'Receita com $query' : query);
+      final titleEn = data['title_en'] as String?;
+      final imageUrl = titleEn != null
+          ? await FoodImageService().fetchImage(id, titleEn)
+          : null;
       return Recipe(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        title: data['title'] as String? ?? (isIngredients ? 'Receita com $query' : query),
+        id: id,
+        title: title,
+        titleEn: titleEn,
         query: isIngredients ? 'Ingredientes: $query' : query,
         createdAt: DateTime.now(),
         time: data['time'] as String? ?? '30 min',
@@ -70,6 +92,7 @@ Inclua pelo menos 4 ingredientes e 3 passos.''';
         category: data['category'] as String? ?? 'Outros',
         ingredients: (data['ingredients'] as List<dynamic>?)?.cast<String>() ?? [],
         steps: (data['steps'] as List<dynamic>?)?.cast<String>() ?? [],
+        imageUrl: imageUrl,
       );
     } catch (_) {
       return Recipe(

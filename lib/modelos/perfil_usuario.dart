@@ -6,6 +6,7 @@ class UserProfile {
   final List<String> alergias;
   final List<String> dietas;
   final List<String> cozinhas;
+  final int? avatarIndex;
 
   const UserProfile({
     required this.name,
@@ -13,6 +14,7 @@ class UserProfile {
     this.alergias = const [],
     this.dietas = const [],
     this.cozinhas = const [],
+    this.avatarIndex,
   });
 
   Map<String, dynamic> toJson() => {
@@ -21,6 +23,7 @@ class UserProfile {
         'alergias': alergias,
         'dietas': dietas,
         'cozinhas': cozinhas,
+        'avatarIndex': avatarIndex,
       };
 
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
@@ -29,6 +32,7 @@ class UserProfile {
         alergias: (json['alergias'] as List<dynamic>?)?.cast<String>() ?? [],
         dietas: (json['dietas'] as List<dynamic>?)?.cast<String>() ?? [],
         cozinhas: (json['cozinhas'] as List<dynamic>?)?.cast<String>() ?? [],
+        avatarIndex: json['avatarIndex'] as int?,
       );
 
   String toJsonString() => jsonEncode(toJson());

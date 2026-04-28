@@ -4,6 +4,8 @@ import '../modelos/perfil_usuario.dart';
 import '../servicos/servico_armazenamento.dart';
 import '../tema/tema_app.dart';
 import '../main.dart';
+import 'tela_foto_picker.dart';
+import 'tela_onboarding.dart';
 
 class CadastroScreen extends StatefulWidget {
   const CadastroScreen({super.key});
@@ -27,6 +29,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
     final List<String> _alergias = [];
   final List<String> _dietas = [];
   final List<String> _cozinhas = [];
+  int? _avatarIndex;
 
   final _storage = StorageService();
 
@@ -108,6 +111,16 @@ class _CadastroScreenState extends State<CadastroScreen> {
     ));
   }
 
+  Future<void> _abrirFotoPicker() async {
+    final index = await Navigator.push<int>(
+      context,
+      MaterialPageRoute(builder: (_) => const TelaFotoPicker()),
+    );
+    if (index != null && mounted) {
+      setState(() => _avatarIndex = index);
+    }
+  }
+
   Future<void> _finish() async {
     final profile = UserProfile(
       name: _nameCtrl.text.trim(),
@@ -115,12 +128,15 @@ class _CadastroScreenState extends State<CadastroScreen> {
       alergias: List.from(_alergias),
       dietas: List.from(_dietas),
       cozinhas: List.from(_cozinhas),
+      avatarIndex: _avatarIndex,
     );
     await _storage.saveProfile(profile);
+    await _storage.savePassword(_passwordCtrl.text);
     if (mounted) {
-      Navigator.pushReplacement(
+      Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const MainApp()),
+        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        (route) => false,
       );
     }
   }
@@ -146,7 +162,6 @@ class _CadastroScreenState extends State<CadastroScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.text),
@@ -413,38 +428,55 @@ class _CadastroScreenState extends State<CadastroScreen> {
   }
 
   Widget _buildStep3() {
+    final hasAvatar = _avatarIndex != null;
+    final foto = hasAvatar ? TelaFotoPicker.fotos[_avatarIndex!] : null;
+
     return Column(
       children: [
         const SizedBox(height: 20),
         Center(
           child: Column(
             children: [
-              Container(
-                width: 120, height: 120,
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  shape: BoxShape.circle,
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x44D4623A),
-                      blurRadius: 24,
-                      offset: Offset(0, 8),
-                    ),
-                  ],
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  _initials,
-                  style: GoogleFonts.poppins(
-                    fontSize: 44,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+              GestureDetector(
+                onTap: _abrirFotoPicker,
+                child: Container(
+                  width: 120, height: 120,
+                  decoration: BoxDecoration(
+                    gradient: hasAvatar
+                        ? LinearGradient(
+                            colors: [foto![0] as Color, foto[1] as Color],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : AppColors.primaryGradient,
+                    shape: BoxShape.circle,
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x44D4623A),
+                        blurRadius: 24,
+                        offset: Offset(0, 8),
+                      ),
+                    ],
                   ),
+                  alignment: Alignment.center,
+                  child: hasAvatar
+                      ? Text(
+                          foto![2] as String,
+                          style: const TextStyle(fontSize: 54),
+                        )
+                      : Text(
+                          _initials,
+                          style: GoogleFonts.poppins(
+                            fontSize: 44,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 24),
               GestureDetector(
-                onTap: () => _snack('Seleção de foto em breve!'),
+                onTap: _abrirFotoPicker,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   decoration: BoxDecoration(
@@ -465,7 +497,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
                       const Icon(Icons.camera_alt_outlined, size: 18, color: AppColors.primary),
                       const SizedBox(width: 8),
                       Text(
-                        'Escolher foto',
+                        hasAvatar ? 'Trocar foto' : 'Escolher foto',
                         style: GoogleFonts.poppins(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,

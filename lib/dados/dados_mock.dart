@@ -4,6 +4,7 @@ final List<Recipe> mockRecipes = [
   Recipe(
     id: 'mock_1',
     title: 'Frango ao Limão Siciliano',
+    titleEn: 'Lemon Chicken',
     query: 'Frango ao Limão Siciliano',
     createdAt: DateTime(2026, 4, 1),
     time: '35 min',
@@ -32,6 +33,7 @@ final List<Recipe> mockRecipes = [
   Recipe(
     id: 'mock_2',
     title: 'Risoto de Cogumelos',
+    titleEn: 'Mushroom Risotto',
     query: 'Risoto de Cogumelos',
     createdAt: DateTime(2026, 4, 2),
     time: '45 min',
@@ -61,6 +63,7 @@ final List<Recipe> mockRecipes = [
   Recipe(
     id: 'mock_3',
     title: 'Tacos de Carnitas',
+    titleEn: 'Pork Tacos',
     query: 'Tacos de Carnitas',
     createdAt: DateTime(2026, 4, 3),
     time: '2h',
@@ -115,6 +118,7 @@ final List<Recipe> mockRecipes = [
   Recipe(
     id: 'mock_5',
     title: 'Pão de Queijo Mineiro',
+    titleEn: 'Cheese Bread',
     query: 'Pão de Queijo Mineiro',
     createdAt: DateTime(2026, 4, 5),
     time: '25 min',
@@ -143,6 +147,7 @@ final List<Recipe> mockRecipes = [
   Recipe(
     id: 'mock_6',
     title: 'Moqueca de Camarão',
+    titleEn: 'Prawn Moqueca',
     query: 'Moqueca de Camarão',
     createdAt: DateTime(2026, 4, 6),
     time: '50 min',
@@ -187,6 +192,7 @@ final List<Map<String, dynamic>> mockCommunityPosts = [
     'time': '2h',
     'emoji': '🍕',
     'title': 'Minha pizza de massa madre ficou perfeita!',
+    'imageSearchEn': 'Margherita Pizza',
     'likes': 142,
     'comments': 23,
     'colorStart': '#FFDED6',
@@ -198,6 +204,7 @@ final List<Map<String, dynamic>> mockCommunityPosts = [
     'time': '5h',
     'emoji': '🎂',
     'title': 'Bolo de chocolate de aniversário — receita da vovó',
+    'imageSearchEn': 'Chocolate Cake',
     'likes': 89,
     'comments': 15,
     'colorStart': '#D4B0E8',
@@ -209,6 +216,7 @@ final List<Map<String, dynamic>> mockCommunityPosts = [
     'time': '1d',
     'emoji': '🥗',
     'title': 'Salada tailandesa com amendoim — leve e deliciosa',
+    'imageSearchEn': 'Thai Green Curry',
     'likes': 67,
     'comments': 8,
     'colorStart': '#C8F7C5',
@@ -220,6 +228,7 @@ final List<Map<String, dynamic>> mockCommunityPosts = [
     'time': '2d',
     'emoji': '🍜',
     'title': 'Ramen caseiro levou 6 horas mas valeu demais!',
+    'imageSearchEn': 'Ramen',
     'likes': 201,
     'comments': 44,
     'colorStart': '#FFE0A0',
@@ -227,19 +236,4 @@ final List<Map<String, dynamic>> mockCommunityPosts = [
   },
 ];
 
-const List<Map<String, String>> mockStories = [
-  {'name': 'Ana L.', 'emoji': '🧑‍🍳'},
-  {'name': 'Carlos', 'emoji': '👨‍🍳'},
-  {'name': 'Mariana', 'emoji': '👩‍🍳'},
-  {'name': 'Pedro', 'emoji': '🧑‍🍳'},
-  {'name': 'Júlia', 'emoji': '👩‍🍳'},
-];
 
-final List<Map<String, dynamic>> mockNotifications = [
-  {'id': 'n1', 'icon': '💬', 'text': 'Ana Lima comentou na sua receita de frango', 'time': '5 min', 'unread': true},
-  {'id': 'n2', 'icon': '❤️', 'text': 'Sua receita de pão de queijo recebeu 50 curtidas!', 'time': '1h', 'unread': true},
-  {'id': 'n3', 'icon': '👨‍🍳', 'text': 'O Chef IA criou uma receita personalizada para você', 'time': '3h', 'unread': true},
-  {'id': 'n4', 'icon': '🏆', 'text': 'Parabéns! Você completou o desafio semanal', 'time': '1d', 'unread': false},
-  {'id': 'n5', 'icon': '👥', 'text': 'Carlos Motta começou a te seguir', 'time': '2d', 'unread': false},
-  {'id': 'n6', 'icon': '⭐', 'text': 'Sua moqueca foi destaque da semana!', 'time': '3d', 'unread': false},
-];

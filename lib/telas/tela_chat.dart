@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../tema/tema_app.dart';
 import '../modelos/receita.dart';
@@ -6,6 +6,7 @@ import '../servicos/servico_gemini.dart';
 import '../servicos/servico_armazenamento.dart';
 import '../config.dart';
 import 'tela_receita.dart';
+import '../main.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -23,6 +24,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   final List<_Msg> _messages = [];
   bool _showTyping = false;
   bool _hasInput = false;
+  List<String> _alergias = [];
+  List<String> _dietas = [];
 
   late final List<AnimationController> _dotControllers;
   late final List<Animation<double>> _dotAnims;
@@ -52,6 +55,17 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       text:
           'Olá, Chef! 👨‍🍳 Sou o Chef IA. Posso criar receitas com os ingredientes que você tem, responder dúvidas e personalizar pratos para você. Como posso ajudar?',
     ));
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    final profile = await _storage.getProfile();
+    if (mounted && profile != null) {
+      setState(() {
+        _alergias = profile.alergias;
+        _dietas = profile.dietas;
+      });
+    }
   }
 
   @override
@@ -106,8 +120,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _scrollBottom();
 
     try {
-      final recipe = await _gemini.generateRecipe(msg);
+      final recipe = await _gemini.generateRecipe(msg, alergias: _alergias, dietas: _dietas);
       await _storage.addToHistory(recipe);
+      await _storage.addNotification(
+        icon: '🤖',
+        text: 'Chef IA criou "${recipe.title}" para você!',
+      );
       if (mounted) {
         _stopDots();
         setState(() {
@@ -150,17 +168,18 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final chatBg = context.isDark ? const Color(0xFF0F0705) : const Color(0xFFEAE0D8);
     return Scaffold(
-      backgroundColor: const Color(0xFFEAE0D8),
+      backgroundColor: chatBg,
       body: SafeArea(
         child: Column(
           children: [
-                        Container(
+            Container(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-              decoration: const BoxDecoration(
-                color: AppColors.cardBg,
-                border: Border(bottom: BorderSide(color: AppColors.border)),
-                boxShadow: [
+              decoration: BoxDecoration(
+                color: context.cardColor,
+                border: Border(bottom: BorderSide(color: context.borderColor)),
+                boxShadow: const [
                   BoxShadow(color: Color(0x0F000000), blurRadius: 4, offset: Offset(0, 1)),
                 ],
               ),
@@ -188,7 +207,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                           style: GoogleFonts.poppins(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.text,
+                            color: context.textColor,
                           ),
                         ),
                         Row(
@@ -215,11 +234,11 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   ),
                   Container(
                     width: 34, height: 34,
-                    decoration: const BoxDecoration(
-                      color: AppColors.chipBg,
+                    decoration: BoxDecoration(
+                      color: context.chipColor,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.more_vert, size: 18, color: AppColors.textMuted),
+                    child: Icon(Icons.more_vert, size: 18, color: context.mutedColor),
                   ),
                 ],
               ),
@@ -235,12 +254,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.cardBg,
+                        color: context.cardColor,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         'HOJE',
-                        style: GoogleFonts.poppins(fontSize: 10, color: AppColors.textMuted),
+                        style: GoogleFonts.poppins(fontSize: 10, color: context.mutedColor),
                       ),
                     ),
                   ),
@@ -264,7 +283,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                       decoration: BoxDecoration(
-                        color: AppColors.cardBg,
+                        color: context.cardColor,
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(color: const Color(0x44D4623A), width: 1.5),
                       ),
@@ -284,40 +303,40 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             Container(
               padding: EdgeInsets.fromLTRB(
                   12, 8, 12, MediaQuery.of(context).padding.bottom + 8),
-              decoration: const BoxDecoration(
-                color: AppColors.cardBg,
-                border: Border(top: BorderSide(color: AppColors.border)),
+              decoration: BoxDecoration(
+                color: context.cardColor,
+                border: Border(top: BorderSide(color: context.borderColor)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Container(
                     width: 40, height: 40,
-                    decoration: const BoxDecoration(
-                      color: AppColors.chipBg,
+                    decoration: BoxDecoration(
+                      color: context.chipColor,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.attach_file, size: 18, color: AppColors.textMuted),
+                    child: Icon(Icons.attach_file, size: 18, color: context.mutedColor),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Container(
                       constraints: const BoxConstraints(maxHeight: 120),
                       decoration: BoxDecoration(
-                        color: AppColors.inputBg,
+                        color: context.inputColor,
                         borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: AppColors.border, width: 1.5),
+                        border: Border.all(color: context.borderColor, width: 1.5),
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                       child: TextField(
                         controller: _inputCtrl,
-                        style: GoogleFonts.poppins(fontSize: 13, color: AppColors.text),
+                        style: GoogleFonts.poppins(fontSize: 13, color: context.textColor),
                         maxLines: null,
                         decoration: InputDecoration(
                           hintText: 'Mensagem para o Chef IA...',
                           hintStyle: GoogleFonts.poppins(
                             fontSize: 13,
-                            color: AppColors.textMuted,
+                            color: context.mutedColor,
                           ),
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
@@ -325,8 +344,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                           filled: false,
                           isDense: true,
                           contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                          suffixIcon: const Icon(Icons.sentiment_satisfied_alt_outlined,
-                              size: 18, color: AppColors.textMuted),
+                          suffixIcon: Icon(Icons.sentiment_satisfied_alt_outlined,
+                              size: 18, color: context.mutedColor),
                         ),
                         onChanged: (v) => setState(() => _hasInput = v.trim().isNotEmpty),
                         onSubmitted: (_) => _send(),
@@ -397,7 +416,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             const SizedBox(height: 2),
             Text(
               '✓✓ Agora',
-              style: GoogleFonts.poppins(fontSize: 10, color: AppColors.textMuted),
+              style: GoogleFonts.poppins(fontSize: 10, color: context.mutedColor),
             ),
           ],
         ),
@@ -430,15 +449,15 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-                  decoration: const BoxDecoration(
-                    color: AppColors.cardBg,
-                    borderRadius: BorderRadius.only(
+                  decoration: BoxDecoration(
+                    color: context.cardColor,
+                    borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(18),
                       topRight: Radius.circular(18),
                       bottomLeft: Radius.circular(4),
                       bottomRight: Radius.circular(18),
                     ),
-                    boxShadow: [
+                    boxShadow: const [
                       BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
                     ],
                   ),
@@ -446,7 +465,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                     msg.text!,
                     style: GoogleFonts.poppins(
                       fontSize: 13,
-                      color: AppColors.text,
+                      color: context.textColor,
                       height: 1.5,
                     ),
                   ),
@@ -454,7 +473,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 const SizedBox(height: 2),
                 Text(
                   'Agora',
-                  style: GoogleFonts.poppins(fontSize: 10, color: AppColors.textMuted),
+                  style: GoogleFonts.poppins(fontSize: 10, color: context.mutedColor),
                 ),
               ],
             ),
@@ -472,9 +491,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         const SizedBox(width: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: const BoxDecoration(
-            color: AppColors.cardBg,
-            borderRadius: BorderRadius.only(
+          decoration: BoxDecoration(
+            color: context.cardColor,
+            borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(18),
               topRight: Radius.circular(18),
               bottomLeft: Radius.circular(4),
@@ -491,8 +510,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   child: Container(
                     width: 7, height: 7,
                     margin: EdgeInsets.only(right: i < 2 ? 5 : 0),
-                    decoration: const BoxDecoration(
-                      color: AppColors.textMuted,
+                    decoration: BoxDecoration(
+                      color: context.mutedColor,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -541,6 +560,7 @@ class _RecipeBubbleState extends State<_RecipeBubble> {
 
   Future<void> _save() async {
     await widget.storage.addFavorite(widget.recipe);
+    favoritesNotifier.value++;
     if (mounted) setState(() => _saved = true);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -561,22 +581,22 @@ class _RecipeBubbleState extends State<_RecipeBubble> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          decoration: const BoxDecoration(
-            color: AppColors.cardBg,
-            borderRadius: BorderRadius.only(
+          decoration: BoxDecoration(
+            color: context.cardColor,
+            borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(4),
               topRight: Radius.circular(18),
               bottomLeft: Radius.circular(18),
               bottomRight: Radius.circular(18),
             ),
-            boxShadow: [
+            boxShadow: const [
               BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
             ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-                            ClipRRect(
+              ClipRRect(
                 borderRadius: const BorderRadius.only(
                   topRight: Radius.circular(18),
                   topLeft: Radius.circular(4),
@@ -606,7 +626,7 @@ class _RecipeBubbleState extends State<_RecipeBubble> {
                       style: GoogleFonts.poppins(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.text,
+                        color: context.textColor,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -655,12 +675,12 @@ class _RecipeBubbleState extends State<_RecipeBubble> {
                             decoration: BoxDecoration(
                               color: _saved
                                   ? const Color(0x1AD4623A)
-                                  : AppColors.chipBg,
+                                  : context.chipColor,
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
                                 color: _saved
                                     ? AppColors.primary
-                                    : AppColors.border,
+                                    : context.borderColor,
                                 width: 1.5,
                               ),
                             ),
@@ -670,14 +690,14 @@ class _RecipeBubbleState extends State<_RecipeBubble> {
                                 Icon(
                                   _saved ? Icons.favorite : Icons.favorite_border,
                                   size: 14,
-                                  color: _saved ? AppColors.primary : AppColors.textMuted,
+                                  color: _saved ? AppColors.primary : context.mutedColor,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   _saved ? 'Salvo' : 'Salvar',
                                   style: GoogleFonts.poppins(
                                     fontSize: 12,
-                                    color: _saved ? AppColors.primary : AppColors.textMuted,
+                                    color: _saved ? AppColors.primary : context.mutedColor,
                                   ),
                                 ),
                               ],
@@ -693,7 +713,7 @@ class _RecipeBubbleState extends State<_RecipeBubble> {
           ),
         ),
         const SizedBox(height: 2),
-        Text('Agora', style: GoogleFonts.poppins(fontSize: 10, color: AppColors.textMuted)),
+        Text('Agora', style: GoogleFonts.poppins(fontSize: 10, color: context.mutedColor)),
       ],
     );
   }
@@ -709,12 +729,12 @@ class _MetaChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.chipBg,
+        color: context.chipColor,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         text,
-        style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textMuted),
+        style: GoogleFonts.poppins(fontSize: 11, color: context.mutedColor),
       ),
     );
   }

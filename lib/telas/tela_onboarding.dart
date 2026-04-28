@@ -2,7 +2,7 @@
 import 'package:google_fonts/google_fonts.dart';
 import '../tema/tema_app.dart';
 import '../servicos/servico_armazenamento.dart';
-import 'tela_login.dart';
+import '../main.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -42,9 +42,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     } else {
       await _storage.setOnboardingDone();
       if (mounted) {
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          MaterialPageRoute(builder: (_) => const MainApp()),
+          (route) => false,
         );
       }
     }
@@ -53,9 +54,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _skip() async {
     await _storage.setOnboardingDone();
     if (mounted) {
-      Navigator.pushReplacement(
+      Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        MaterialPageRoute(builder: (_) => const MainApp()),
+        (route) => false,
       );
     }
   }
@@ -64,7 +66,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     final slide = _slides[_step];
     return Scaffold(
-      backgroundColor: AppColors.bg,
       body: SafeArea(
         child: Stack(
           children: [

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../tema/tema_app.dart';
 import '../modelos/receita.dart';
@@ -6,6 +6,12 @@ import '../servicos/servico_armazenamento.dart';
 import 'tela_receita.dart';
 import 'tela_favoritos.dart';
 import 'tela_historico.dart';
+import 'tela_editar_perfil.dart';
+import 'tela_configuracoes.dart';
+import 'tela_suporte.dart';
+import 'tela_login.dart';
+import 'tela_foto_picker.dart';
+import 'menu_sheet.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,6 +24,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _storage = StorageService();
   String _name = 'Chef';
   String _email = '';
+  int? _avatarIndex;
   int _recipesCount = 0;
   int _favoritesCount = 0;
   int _publishedCount = 0;
@@ -40,6 +47,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _name = profile?.name ?? 'Chef';
         _email = profile?.email ?? '';
+        _avatarIndex = profile?.avatarIndex;
         _recipesCount = history.length;
         _favoritesCount = favorites.length;
         _publishedCount = published.length;
@@ -64,18 +72,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        backgroundColor: AppColors.bg,
         body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
       );
     }
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
             children: [
-                            Stack(
+              Stack(
                 clipBehavior: Clip.none,
                 alignment: Alignment.bottomCenter,
                 children: [
@@ -90,19 +96,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Container(
                       width: 88, height: 88,
                       decoration: BoxDecoration(
-                        gradient: AppColors.primaryGradient,
+                        gradient: _avatarIndex != null
+                            ? LinearGradient(
+                                colors: [
+                                  TelaFotoPicker.fotos[_avatarIndex!][0] as Color,
+                                  TelaFotoPicker.fotos[_avatarIndex!][1] as Color,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                            : AppColors.primaryGradient,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.bg, width: 4),
+                        border: Border.all(color: context.appBg, width: 4),
                       ),
                       alignment: Alignment.center,
-                      child: Text(
-                        _initials,
-                        style: GoogleFonts.poppins(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
+                      child: _avatarIndex != null
+                          ? Text(
+                              TelaFotoPicker.fotos[_avatarIndex!][2] as String,
+                              style: const TextStyle(fontSize: 40),
+                            )
+                          : Text(
+                              _initials,
+                              style: GoogleFonts.poppins(
+                                fontSize: 32,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -114,13 +134,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: GoogleFonts.poppins(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.text,
+                  color: context.textColor,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 _email.isNotEmpty ? '@${_email.split('@').first}' : '@chef',
-                style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textMuted),
+                style: GoogleFonts.poppins(fontSize: 12, color: context.mutedColor),
               ),
               const SizedBox(height: 16),
               // Stats
@@ -130,9 +150,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _Stat(value: '$_recipesCount', label: 'Receitas'),
-                    _statDivider(),
+                    _statDivider(context),
                     _Stat(value: '$_favoritesCount', label: 'Favoritos'),
-                    _statDivider(),
+                    _statDivider(context),
                     _Stat(value: '$_publishedCount', label: 'Publicadas'),
                   ],
                 ),
@@ -161,7 +181,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           color: Colors.transparent,
                           child: InkWell(
                             borderRadius: BorderRadius.circular(12),
-                            onTap: () {},
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const TelaEditarPerfil(),
+                              ),
+                            ).then((atualizado) {
+                              if (atualizado == true) _load();
+                            }),
                             child: Center(
                               child: Text(
                                 'Editar perfil',
@@ -177,14 +204,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Container(
-                      width: 40, height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.cardBg,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
+                    GestureDetector(
+                      onTap: () => mostrarMenuSheet(
+                        context,
+                        nome: _name,
+                        email: _email,
+                        onLogout: () => Navigator.of(context)
+                            .pushAndRemoveUntil(
+                          MaterialPageRoute(builder: (_) => const LoginScreen()),
+                          (_) => false,
+                        ),
+                        onHistorico: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                        ).then((_) => _load()),
+                        onFavoritos: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const FavoritesScreen()),
+                        ).then((_) => _load()),
+                        onConfiguracoes: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const TelaConfiguracoes()),
+                        ),
+                        onSuporte: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const TelaSuporte()),
+                        ),
+                        onEditarPerfil: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const TelaEditarPerfil()),
+                        ).then((atualizado) {
+                          if (atualizado == true) _load();
+                        }),
                       ),
-                      child: const Icon(Icons.more_horiz, size: 18, color: AppColors.text),
+                      child: Container(
+                        width: 40, height: 40,
+                        decoration: BoxDecoration(
+                          color: context.cardColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: context.borderColor),
+                        ),
+                        child: Icon(Icons.more_horiz, size: 18, color: context.textColor),
+                      ),
                     ),
                   ],
                 ),
@@ -236,7 +297,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
               ),
-              const Divider(color: AppColors.border, height: 1),
+              Divider(color: context.borderColor, height: 1),
               // Grid de receitas
               _publishedRecipes.isEmpty
                   ? Padding(
@@ -249,7 +310,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             'Nenhuma receita publicada ainda',
                             style: GoogleFonts.poppins(
                               fontSize: 14,
-                              color: AppColors.textMuted,
+                              color: context.mutedColor,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -302,10 +363,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _statDivider() => Container(
+  Widget _statDivider(BuildContext context) => Container(
         width: 1,
         height: 36,
-        color: AppColors.border,
+        color: context.borderColor,
       );
 }
 
@@ -324,12 +385,12 @@ class _Stat extends StatelessWidget {
           style: GoogleFonts.poppins(
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            color: AppColors.text,
+            color: context.textColor,
           ),
         ),
         Text(
           label,
-          style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textMuted),
+          style: GoogleFonts.poppins(fontSize: 11, color: context.mutedColor),
         ),
       ],
     );
@@ -349,9 +410,9 @@ class _ShortcutBtn extends StatelessWidget {
       child: Container(
         height: 44,
         decoration: BoxDecoration(
-          color: AppColors.cardBg,
+          color: context.cardColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: context.borderColor),
           boxShadow: const [
             BoxShadow(color: Color(0x0D000000), blurRadius: 4, offset: Offset(0, 2)),
           ],
@@ -362,7 +423,7 @@ class _ShortcutBtn extends StatelessWidget {
           style: GoogleFonts.poppins(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: AppColors.text,
+            color: context.textColor,
           ),
         ),
       ),
@@ -398,7 +459,7 @@ class _TabItem extends StatelessWidget {
             style: GoogleFonts.poppins(
               fontSize: 13,
               fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-              color: active ? AppColors.primary : AppColors.textMuted,
+              color: active ? AppColors.primary : context.mutedColor,
             ),
           ),
         ),

@@ -18,6 +18,8 @@ class Recipe {
   final String category;
   final List<String> ingredients;
   final List<String> steps;
+  final String? imageUrl;
+  final String? titleEn;
 
   Recipe({
     required this.id,
@@ -37,6 +39,8 @@ class Recipe {
     this.category = 'Outros',
     this.ingredients = const [],
     this.steps = const [],
+    this.imageUrl,
+    this.titleEn,
   });
 
   Map<String, dynamic> toJson() => {
@@ -57,6 +61,8 @@ class Recipe {
         'category': category,
         'ingredients': ingredients,
         'steps': steps,
+        'imageUrl': imageUrl,
+        'titleEn': titleEn,
       };
 
   factory Recipe.fromJson(Map<String, dynamic> json) => Recipe(
@@ -77,6 +83,8 @@ class Recipe {
         category: json['category'] as String? ?? 'Outros',
         ingredients: (json['ingredients'] as List<dynamic>?)?.cast<String>() ?? [],
         steps: (json['steps'] as List<dynamic>?)?.cast<String>() ?? [],
+        imageUrl: json['imageUrl'] as String?,
+        titleEn: json['titleEn'] as String?,
       );
 
   String toJsonString() => jsonEncode(toJson());

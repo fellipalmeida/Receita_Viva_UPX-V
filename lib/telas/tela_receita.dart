@@ -1,9 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../modelos/receita.dart';
 import '../servicos/servico_armazenamento.dart';
 import '../tema/tema_app.dart';
+import '../widgets/food_image.dart';
 import 'tela_publicar.dart';
+import '../main.dart';
 
 class RecipeScreen extends StatefulWidget {
   final Recipe recipe;
@@ -17,7 +19,8 @@ class RecipeScreen extends StatefulWidget {
 class _RecipeScreenState extends State<RecipeScreen> {
   final _storage = StorageService();
   bool _isFavorite = false;
-  bool _tab = true; 
+  bool _tab = true;
+
   @override
   void initState() {
     super.initState();
@@ -35,6 +38,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
     } else {
       await _storage.addFavorite(widget.recipe);
     }
+    favoritesNotifier.value++;
     if (mounted) {
       setState(() => _isFavorite = !_isFavorite);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -51,40 +55,28 @@ class _RecipeScreenState extends State<RecipeScreen> {
     }
   }
 
-  Color _hexToColor(String hex) {
-    final h = hex.replaceAll('#', '');
-    return Color(int.parse('FF$h', radix: 16));
-  }
-
   @override
   Widget build(BuildContext context) {
     final recipe = widget.recipe;
     final hasStructured = recipe.ingredients.isNotEmpty || recipe.steps.isNotEmpty;
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
       body: CustomScrollView(
         slivers: [
-                    SliverToBoxAdapter(
+          SliverToBoxAdapter(
             child: Stack(
               children: [
-                Container(
-                  height: 220,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        _hexToColor(recipe.colorStart),
-                        _hexToColor(recipe.colorEnd),
-                      ],
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(recipe.emoji, style: const TextStyle(fontSize: 100)),
+                SizedBox(
+                  height: 240,
+                  width: double.infinity,
+                  child: FoodImage(
+                    recipe: recipe,
+                    height: 240,
+                    width: double.infinity,
+                    emojiFontSize: 100,
                   ),
                 ),
-                                Positioned(
+                Positioned(
                   bottom: 0, left: 0, right: 0,
                   child: Container(
                     height: 80,
@@ -97,7 +89,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                     ),
                   ),
                 ),
-                                Positioned(
+                Positioned(
                   top: MediaQuery.of(context).padding.top + 8,
                   left: 16,
                   child: _HeroButton(
@@ -105,7 +97,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                     child: const Icon(Icons.arrow_back, size: 18, color: Color(0xFF333333)),
                   ),
                 ),
-                                Positioned(
+                Positioned(
                   top: MediaQuery.of(context).padding.top + 8,
                   right: 16,
                   child: _HeroButton(
@@ -117,15 +109,13 @@ class _RecipeScreenState extends State<RecipeScreen> {
                     ),
                   ),
                 ),
-                                Positioned(
+                Positioned(
                   top: MediaQuery.of(context).padding.top + 8,
                   right: 64,
                   child: _HeroButton(
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => PublishScreen(recipe: recipe),
-                      ),
+                      MaterialPageRoute(builder: (_) => PublishScreen(recipe: recipe)),
                     ),
                     child: const Icon(Icons.people_outline, size: 18, color: Color(0xFF333333)),
                   ),
@@ -133,23 +123,23 @@ class _RecipeScreenState extends State<RecipeScreen> {
               ],
             ),
           ),
-                    SliverPadding(
+          SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                                Text(
+                Text(
                   recipe.title,
                   style: GoogleFonts.poppins(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.text,
+                    color: context.textColor,
                   ),
                 ),
                 const SizedBox(height: 14),
-                                Container(
+                Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.cardBg,
+                    color: context.cardColor,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: const [
                       BoxShadow(color: Color(0x1AD4623A), blurRadius: 12, offset: Offset(0, 2)),
@@ -158,21 +148,21 @@ class _RecipeScreenState extends State<RecipeScreen> {
                   child: Row(
                     children: [
                       _InfoStat(label: '⏱ Tempo', value: recipe.time),
-                      _divider(),
+                      _divider(context),
                       _InfoStat(label: '👤 Porções', value: recipe.servings),
-                      _divider(),
+                      _divider(context),
                       _InfoStat(label: '📊 Nível', value: recipe.difficulty),
-                      _divider(),
+                      _divider(context),
                       _InfoStat(label: '⭐ Nota', value: recipe.rating.toString()),
                     ],
                   ),
                 ),
                 const SizedBox(height: 16),
                 if (hasStructured) ...[
-                                    Container(
+                  Container(
                     padding: const EdgeInsets.all(3),
                     decoration: BoxDecoration(
-                      color: AppColors.chipBg,
+                      color: context.chipColor,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -201,7 +191,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.cardBg,
+                      color: context.cardColor,
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: const [
                         BoxShadow(color: Color(0x0D000000), blurRadius: 8, offset: Offset(0, 2)),
@@ -211,7 +201,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                       recipe.content!,
                       style: GoogleFonts.poppins(
                         fontSize: 13,
-                        color: AppColors.text,
+                        color: context.textColor,
                         height: 1.7,
                       ),
                     ),
@@ -225,10 +215,10 @@ class _RecipeScreenState extends State<RecipeScreen> {
     );
   }
 
-  Widget _divider() => Container(
+  Widget _divider(BuildContext context) => Container(
         width: 1, height: 32,
         margin: const EdgeInsets.symmetric(horizontal: 8),
-        color: AppColors.border,
+        color: context.borderColor,
       );
 }
 
@@ -270,14 +260,14 @@ class _InfoStat extends StatelessWidget {
             style: GoogleFonts.poppins(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: AppColors.text,
+              color: context.textColor,
             ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 2),
           Text(
             label,
-            style: GoogleFonts.poppins(fontSize: 10, color: AppColors.textMuted),
+            style: GoogleFonts.poppins(fontSize: 10, color: context.mutedColor),
             textAlign: TextAlign.center,
           ),
         ],
@@ -311,7 +301,7 @@ class _TabBtn extends StatelessWidget {
             style: GoogleFonts.poppins(
               fontSize: 12,
               fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-              color: active ? Colors.white : AppColors.textMuted,
+              color: active ? Colors.white : context.mutedColor,
             ),
           ),
         ),
@@ -331,7 +321,7 @@ class _IngredientCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.cardBg,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: const [
           BoxShadow(color: Color(0x1AD4623A), blurRadius: 8, offset: Offset(0, 2)),
@@ -341,16 +331,13 @@ class _IngredientCard extends StatelessWidget {
         children: [
           Container(
             width: 8, height: 8,
-            decoration: const BoxDecoration(
-              color: AppColors.primary,
-              shape: BoxShape.circle,
-            ),
+            decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               text,
-              style: GoogleFonts.poppins(fontSize: 13, color: AppColors.text),
+              style: GoogleFonts.poppins(fontSize: 13, color: context.textColor),
             ),
           ),
         ],
@@ -371,7 +358,7 @@ class _StepCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.cardBg,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(14),
         boxShadow: const [
           BoxShadow(color: Color(0x1AD4623A), blurRadius: 8, offset: Offset(0, 2)),
@@ -390,10 +377,7 @@ class _StepCard extends StatelessWidget {
             child: Text(
               '$index',
               style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
+                fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
             ),
           ),
           const SizedBox(width: 12),
@@ -401,10 +385,7 @@ class _StepCard extends StatelessWidget {
             child: Text(
               text,
               style: GoogleFonts.poppins(
-                fontSize: 13,
-                color: AppColors.text,
-                height: 1.6,
-              ),
+                fontSize: 13, color: context.textColor, height: 1.6),
             ),
           ),
         ],

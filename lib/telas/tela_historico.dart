@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../modelos/receita.dart';
 import '../servicos/servico_armazenamento.dart';
@@ -77,7 +77,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
       appBar: AppBar(
         title: const Text('Histórico'),
         actions: [
@@ -113,13 +112,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
             style: GoogleFonts.poppins(
               fontSize: 17,
               fontWeight: FontWeight.w700,
-              color: AppColors.text,
+              color: context.textColor,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             'Suas receitas geradas aparecerão aqui.',
-            style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textMuted),
+            style: GoogleFonts.poppins(fontSize: 13, color: context.mutedColor),
           ),
         ],
       ),
@@ -127,7 +126,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Widget _buildList() {
-        final Map<String, List<Recipe>> grouped = {};
+    final Map<String, List<Recipe>> grouped = {};
     for (final r in _history) {
       final key = _formatDate(r.createdAt);
       grouped.putIfAbsent(key, () => []).add(r);
@@ -146,7 +145,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 style: GoogleFonts.poppins(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textMuted,
+                  color: context.mutedColor,
                   letterSpacing: 1,
                 ),
               ),
@@ -168,7 +167,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: AppColors.cardBg,
+          color: context.cardColor,
           borderRadius: BorderRadius.circular(14),
           boxShadow: const [
             BoxShadow(color: Color(0x1AD4623A), blurRadius: 8, offset: Offset(0, 2)),
@@ -204,7 +203,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.text,
+                      color: context.textColor,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -230,14 +229,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       const SizedBox(width: 6),
                       Text(
                         _formatTime(recipe.createdAt),
-                        style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textMuted),
+                        style: GoogleFonts.poppins(fontSize: 11, color: context.mutedColor),
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textMuted),
+            Icon(Icons.arrow_forward_ios, size: 14, color: context.mutedColor),
           ],
         ),
       ),

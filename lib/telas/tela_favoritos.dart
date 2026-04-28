@@ -1,9 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../modelos/receita.dart';
 import '../servicos/servico_armazenamento.dart';
 import '../tema/tema_app.dart';
 import 'tela_receita.dart';
+import '../widgets/food_image.dart';
+import '../main.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -21,6 +23,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   void initState() {
     super.initState();
     _load();
+    favoritesNotifier.addListener(_load);
+  }
+
+  @override
+  void dispose() {
+    favoritesNotifier.removeListener(_load);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -30,6 +39,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   Future<void> _remove(Recipe recipe) async {
     await _storage.removeFavorite(recipe.id);
+    favoritesNotifier.value++;
     setState(() => _favorites.removeWhere((r) => r.id == recipe.id));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -43,15 +53,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     }
   }
 
-  Color _hexToColor(String hex) {
-    final h = hex.replaceAll('#', '');
-    return Color(int.parse('FF$h', radix: 16));
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
       appBar: AppBar(
         title: Row(
           mainAxisSize: MainAxisSize.min,
@@ -107,14 +111,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             style: GoogleFonts.poppins(
               fontSize: 17,
               fontWeight: FontWeight.w700,
-              color: AppColors.text,
+              color: context.textColor,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             'Salve suas receitas preferidas\npara acessar rapidamente',
             textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textMuted),
+            style: GoogleFonts.poppins(fontSize: 13, color: context.mutedColor),
           ),
         ],
       ),
@@ -133,7 +137,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.cardBg,
+          color: context.cardColor,
           borderRadius: BorderRadius.circular(18),
           boxShadow: const [
             BoxShadow(color: Color(0x1AD4623A), blurRadius: 12, offset: Offset(0, 2)),
@@ -141,23 +145,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         ),
         child: Row(
           children: [
-            ClipRRect(
+            FoodImage(
+              recipe: recipe,
+              width: 80,
+              height: 80,
               borderRadius: BorderRadius.circular(14),
-              child: Container(
-                width: 80, height: 80,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      _hexToColor(recipe.colorStart),
-                      _hexToColor(recipe.colorEnd),
-                    ],
-                  ),
-                ),
-                alignment: Alignment.center,
-                child: Text(recipe.emoji, style: const TextStyle(fontSize: 40)),
-              ),
+              emojiFontSize: 40,
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -169,7 +162,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.text,
+                      color: context.textColor,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -177,11 +170,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   const SizedBox(height: 4),
                   Text(
                     '⏱ ${recipe.time}  ·  ${recipe.servings}',
-                    style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textMuted),
+                    style: GoogleFonts.poppins(fontSize: 11, color: context.mutedColor),
                   ),
                   Text(
                     '⭐ ${recipe.rating}  ·  ${recipe.difficulty}',
-                    style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textMuted),
+                    style: GoogleFonts.poppins(fontSize: 11, color: context.mutedColor),
                   ),
                 ],
               ),

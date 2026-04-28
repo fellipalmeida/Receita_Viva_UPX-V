@@ -1,10 +1,10 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../tema/tema_app.dart';
-import '../modelos/perfil_usuario.dart';
 import '../servicos/servico_armazenamento.dart';
 import '../main.dart';
 import 'tela_cadastro.dart';
+import 'tela_onboarding.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -26,17 +26,61 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg, style: GoogleFonts.poppins(fontSize: 13)),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ));
+  }
+
   Future<void> _enter() async {
     final email = _emailCtrl.text.trim();
-    final name = email.isNotEmpty ? email.split('@').first : 'Chef';
-    final profile = UserProfile(name: name, email: email);
-    await _storage.saveProfile(profile);
+    final password = _passwordCtrl.text;
+    if (email.isEmpty || password.isEmpty) {
+      _snack('Preencha e-mail e senha');
+      return;
+    }
+    final profile = await _storage.getProfile();
+    final savedPassword = await _storage.getPassword();
+    if (profile == null || savedPassword == null) {
+      _snack('Conta não encontrada. Crie uma conta primeiro.');
+      return;
+    }
+    if (profile.email != email) {
+      _snack('E-mail não encontrado');
+      return;
+    }
+    if (savedPassword != password) {
+      _snack('Senha incorreta');
+      return;
+    }
     if (mounted) {
+      final done = await _storage.isOnboardingDone();
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const MainApp()),
+        MaterialPageRoute(
+          builder: (_) => done ? const MainApp() : const OnboardingScreen(),
+        ),
       );
     }
+  }
+
+  Future<void> _enterSocial() async {
+    final profile = await _storage.getProfile();
+    if (profile != null && mounted) {
+      final done = await _storage.isOnboardingDone();
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => done ? const MainApp() : const OnboardingScreen(),
+        ),
+      );
+      return;
+    }
+    _snack('Crie uma conta primeiro para usar login social');
   }
 
   void _goSignup() {
@@ -49,7 +93,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
       body: SafeArea(
         child: Stack(
           children: [
@@ -173,9 +216,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   ]),
                   const SizedBox(height: 16),
                   Row(children: [
-                    Expanded(child: _SocialButton(label: 'Google', icon: 'G', onTap: _enter)),
+                    Expanded(child: _SocialButton(label: 'Google', icon: 'G', onTap: _enterSocial)),
                     const SizedBox(width: 12),
-                    Expanded(child: _SocialButton(label: 'Apple', icon: '🍎', onTap: _enter)),
+                    Expanded(child: _SocialButton(label: 'Apple', icon: '🍎', onTap: _enterSocial)),
                   ]),
                   const SizedBox(height: 32),
                   Row(mainAxisAlignment: MainAxisAlignment.center, children: [
