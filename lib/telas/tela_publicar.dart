@@ -2,6 +2,7 @@
 import 'package:google_fonts/google_fonts.dart';
 import '../modelos/receita.dart';
 import '../servicos/servico_armazenamento.dart';
+import '../servicos/servico_comunidade_firebase.dart';
 import '../tema/tema_app.dart';
 
 class PublishScreen extends StatefulWidget {
@@ -66,7 +67,7 @@ class _PublishScreenState extends State<PublishScreen> {
         ingredients: base?.ingredients ?? [],
         steps: base?.steps ?? [],
       );
-      await _storage.publishRecipe(recipe);
+      await ComunidadeService().publicar(recipe);
       await _storage.addNotification(
         icon: '🍳',
         text: 'Receita "${recipe.title}" publicada na comunidade!',

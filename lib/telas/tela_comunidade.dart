@@ -4,10 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import '../tema/tema_app.dart';
 import '../modelos/receita.dart';
 import '../servicos/servico_armazenamento.dart';
+import '../servicos/servico_comunidade_firebase.dart';
 import '../dados/dados_mock.dart';
 import 'tela_receita.dart';
 import 'tela_publicar.dart';
-import '../widgets/food_image.dart';
 import '../servicos/servico_imagem.dart';
 
 class CommunityScreen extends StatefulWidget {
@@ -19,11 +19,17 @@ class CommunityScreen extends StatefulWidget {
 
 class _CommunityScreenState extends State<CommunityScreen> {
   final _storage = StorageService();
-  final _searchCtrl = TextEditingController();
   Set<String> _likedPosts = {};
+  final Set<String> _savedPosts = {};
   List<Recipe> _userPosts = [];
   bool _loading = true;
-  String _searchQuery = '';
+  String _filter = 'recentes';
+
+  static const _filters = [
+    {'id': 'recentes', 'label': 'Recentes'},
+    {'id': 'populares', 'label': 'Populares'},
+    {'id': 'rede', 'label': 'Da minha rede'},
+  ];
 
   @override
   void initState() {
@@ -33,11 +39,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
   Future<void> _load() async {
     final liked = await _storage.getLikedPosts();
-    final userPosts = await _storage.getCommunityRecipes();
+    final firestorePosts = await ComunidadeService().getPosts();
     if (mounted) {
       setState(() {
         _likedPosts = liked;
-        _userPosts = userPosts;
+        _userPosts = firestorePosts;
         _loading = false;
       });
     }
@@ -54,37 +60,26 @@ class _CommunityScreenState extends State<CommunityScreen> {
     });
   }
 
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
+  void _toggleSave(String postId) {
+    setState(() {
+      if (_savedPosts.contains(postId)) {
+        _savedPosts.remove(postId);
+      } else {
+        _savedPosts.add(postId);
+      }
+    });
   }
 
   List<Map<String, dynamic>> get _filteredMockPosts {
-    if (_searchQuery.isEmpty) return mockCommunityPosts;
-    final q = _searchQuery.toLowerCase();
-    return mockCommunityPosts
-        .where((p) =>
-            (p['title'] as String).toLowerCase().contains(q) ||
-            (p['user'] as String).toLowerCase().contains(q))
-        .toList();
-  }
-
-  List<Recipe> get _filteredUserPosts {
-    if (_searchQuery.isEmpty) return _userPosts;
-    final q = _searchQuery.toLowerCase();
-    return _userPosts
-        .where((r) =>
-            r.title.toLowerCase().contains(q) ||
-            (r.author ?? '').toLowerCase().contains(q))
-        .toList();
+    var posts = List<Map<String, dynamic>>.from(mockCommunityPosts);
+    if (_filter == 'populares') {
+      posts.sort((a, b) => (b['likes'] as int).compareTo(a['likes'] as int));
+    }
+    return posts;
   }
 
   void _openPublish() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const PublishScreen()),
-    );
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => const PublishScreen()));
     _load();
   }
 
@@ -96,245 +91,217 @@ class _CommunityScreenState extends State<CommunityScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openPublish,
-        icon: const Icon(Icons.add),
-        label: Text(
-          'Publicar',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14),
-        ),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 4,
-      ),
       body: SafeArea(
-        child: _loading
-            ? const Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
-              )
-            : RefreshIndicator(
-                onRefresh: _load,
-                color: AppColors.primary,
-                child: CustomScrollView(
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Comunidade',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w700,
-                                  color: context.textColor,
-                                ),
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: _openPublish,
-                              child: Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: context.cardColor,
-                                  borderRadius: BorderRadius.circular(10),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Color(0x1AD4623A),
-                                      blurRadius: 8,
-                                      offset: Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.add,
-                                  size: 18,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ),
-                          ],
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                _buildHeader(),
+                _buildFilters(),
+                Expanded(
+                  child: _loading
+                      ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                      : RefreshIndicator(
+                          onRefresh: _load,
+                          color: AppColors.primary,
+                          child: _buildFeed(),
                         ),
-                      ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: context.cardColor,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: context.borderColor),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.search, size: 18, color: context.mutedColor),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: TextField(
-                                  controller: _searchCtrl,
-                                  style: GoogleFonts.poppins(fontSize: 13, color: context.textColor),
-                                  decoration: InputDecoration(
-                                    hintText: 'Buscar na comunidade...',
-                                    hintStyle: GoogleFonts.poppins(fontSize: 13, color: context.mutedColor),
-                                    border: InputBorder.none,
-                                    enabledBorder: InputBorder.none,
-                                    focusedBorder: InputBorder.none,
-                                    filled: false,
-                                    isDense: true,
-                                    contentPadding: EdgeInsets.zero,
-                                  ),
-                                  onChanged: (v) => setState(() => _searchQuery = v.trim()),
-                                ),
-                              ),
-                              if (_searchQuery.isNotEmpty)
-                                GestureDetector(
-                                  onTap: () {
-                                    _searchCtrl.clear();
-                                    setState(() => _searchQuery = '');
-                                  },
-                                  child: Icon(Icons.close, size: 16, color: context.mutedColor),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (_, i) {
-                          final mockPosts = _filteredMockPosts;
-                          final userPosts = _filteredUserPosts;
-                          if (i < mockPosts.length) {
-                            final post = mockPosts[i];
-                            final postId = post['id'] as String;
-                            final liked = _likedPosts.contains(postId);
-                            return _PostCard(
-                              postId: postId,
-                              user: post['user'] as String,
-                              time: '${post['time']} atrás',
-                              emoji: post['emoji'] as String,
-                              title: post['title'] as String,
-                              imageSearchEn: post['imageSearchEn'] as String?,
-                              likes: (post['likes'] as int) + (liked ? 1 : 0),
-                              comments: post['comments'] as int,
-                              colorStart: post['colorStart'] as String,
-                              colorEnd: post['colorEnd'] as String,
-                              liked: liked,
-                              onLike: () => _toggleLike(postId),
-                              hexToColor: _hexToColor,
-                            );
-                          }
-                          final recipe = userPosts[i - mockPosts.length];
-                          final liked = _likedPosts.contains(recipe.id);
-                          return _PostCard(
-                            postId: recipe.id,
-                            user: recipe.author ?? 'Você',
-                            time: 'recentemente',
-                            emoji: recipe.emoji,
-                            title: recipe.title,
-                            likes: liked ? 1 : 0,
-                            comments: 0,
-                            colorStart: recipe.colorStart,
-                            colorEnd: recipe.colorEnd,
-                            liked: liked,
-                            onLike: () => _toggleLike(recipe.id),
-                            hexToColor: _hexToColor,
-                            recipe: recipe,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => RecipeScreen(recipe: recipe),
-                              ),
-                            ),
-                          );
-                        },
-                        childCount: _filteredMockPosts.length + _filteredUserPosts.length,
-                      ),
-                    ),
-                    const SliverToBoxAdapter(child: SizedBox(height: 100)),
-                  ],
+                ),
+              ],
+            ),
+            Positioned(
+              bottom: 24,
+              right: 20,
+              child: _buildFab(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Comunidade',
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 22, color: context.textColor, letterSpacing: -0.3)),
+              Text('Receitas compartilhadas por cozinheiros',
+                  style: GoogleFonts.poppins(fontSize: 11, color: context.mutedColor)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilters() {
+    return SizedBox(
+      width: double.infinity,
+      child: SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(20, 6, 20, 8),
+      child: Row(
+        children: _filters.map((f) {
+          final active = _filter == f['id'];
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => setState(() => _filter = f['id']!),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: active ? AppColors.primary : context.chipColor,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  f['label']!,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                    color: active ? Colors.white : context.textColor,
+                  ),
                 ),
               ),
+            ),
+          );
+        }).toList(),
+      ),
+      ),
+    );
+  }
+
+  Widget _buildFeed() {
+    final mockPosts = _filteredMockPosts;
+
+    // Combine mock + user posts (user posts come after mocks)
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
+      itemCount: mockPosts.length + _userPosts.length,
+      itemBuilder: (_, i) {
+        if (i < mockPosts.length) {
+          final post = mockPosts[i];
+          return _MockPostCard(
+            post: post,
+            liked: _likedPosts.contains(post['id'] as String),
+            saved: _savedPosts.contains(post['id'] as String),
+            onLike: () => _toggleLike(post['id'] as String),
+            onSave: () => _toggleSave(post['id'] as String),
+            hexToColor: _hexToColor,
+          );
+        }
+        final recipe = _userPosts[i - mockPosts.length];
+        return _RecipePostCard(
+          recipe: recipe,
+          liked: _likedPosts.contains(recipe.id),
+          saved: _savedPosts.contains(recipe.id),
+          onLike: () => _toggleLike(recipe.id),
+          onSave: () => _toggleSave(recipe.id),
+          onVerReceita: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => RecipeScreen(recipe: recipe)),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFab() {
+    return GestureDetector(
+      onTap: _openPublish,
+      child: Container(
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: BoxDecoration(
+          gradient: AppColors.primaryGradient,
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: [BoxShadow(color: AppColors.primary.withAlpha(102), blurRadius: 20, offset: const Offset(0, 6))],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.add, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Text('Publicar receita',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white)),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _PostCard extends StatefulWidget {
-  final String postId;
-  final String user;
-  final String time;
-  final String emoji;
-  final String title;
-  final int likes;
-  final int comments;
-  final String colorStart;
-  final String colorEnd;
-  final bool liked;
-  final VoidCallback onLike;
-  final Color Function(String) hexToColor;
-  final VoidCallback? onTap;
-  final Recipe? recipe;
-  final String? imageSearchEn;
+// ── Card para posts do mock ─────────────────────────────────────
 
-  const _PostCard({
-    required this.postId,
-    required this.user,
-    required this.time,
-    required this.emoji,
-    required this.title,
-    required this.likes,
-    required this.comments,
-    required this.colorStart,
-    required this.colorEnd,
+class _MockPostCard extends StatefulWidget {
+  final Map<String, dynamic> post;
+  final bool liked;
+  final bool saved;
+  final VoidCallback onLike;
+  final VoidCallback onSave;
+  final Color Function(String) hexToColor;
+
+  const _MockPostCard({
+    required this.post,
     required this.liked,
+    required this.saved,
     required this.onLike,
+    required this.onSave,
     required this.hexToColor,
-    this.onTap,
-    this.recipe,
-    this.imageSearchEn,
   });
 
   @override
-  State<_PostCard> createState() => _PostCardState();
+  State<_MockPostCard> createState() => _MockPostCardState();
 }
 
-class _PostCardState extends State<_PostCard> {
+class _MockPostCardState extends State<_MockPostCard> {
   String? _fetchedUrl;
 
   @override
   void initState() {
     super.initState();
-    if (widget.recipe == null && widget.imageSearchEn != null) {
-      _loadImage();
-    }
+    final imageSearchEn = widget.post['imageSearchEn'] as String?;
+    if (imageSearchEn != null) _loadImage(imageSearchEn);
   }
 
-  Future<void> _loadImage() async {
-    final url = await FoodImageService().fetchImage(widget.postId, widget.imageSearchEn!);
+  Future<void> _loadImage(String query) async {
+    final url = await FoodImageService().fetchImage(widget.post['id'] as String, query);
     if (mounted) setState(() => _fetchedUrl = url);
   }
 
-  String _initials(String name) {
-    final parts = name.trim().split(' ');
-    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    return name.isNotEmpty ? name[0].toUpperCase() : '?';
+  @override
+  Widget build(BuildContext context) {
+    final post = widget.post;
+    return _PostCard(
+      id: post['id'] as String,
+      user: post['user'] as String,
+      posted: '${post['time']} atrás',
+      emoji: post['emoji'] as String,
+      title: post['title'] as String,
+      desc: post['desc'] as String? ?? '',
+      timeReceita: post['timeReceita'] as String? ?? '',
+      diff: post['diff'] as String? ?? '',
+      servings: post['servings'] as String? ?? '',
+      rating: (post['rating'] as num?)?.toDouble() ?? 0,
+      likes: (post['likes'] as int) + (widget.liked ? 1 : 0),
+      liked: widget.liked,
+      saved: widget.saved,
+      onLike: widget.onLike,
+      onSave: widget.onSave,
+      onVerReceita: null,
+      imageWidget: _buildImage(post),
+    );
   }
 
-  Widget _buildImage() {
-    if (widget.recipe != null) {
-      return FoodImage(
-        recipe: widget.recipe!,
-        width: double.infinity,
-        height: 200,
-        emojiFontSize: 90,
-      );
-    }
-
+  Widget _buildImage(Map<String, dynamic> post) {
     if (_fetchedUrl != null) {
       final displayUrl = kIsWeb
           ? 'https://corsproxy.io/?${Uri.encodeComponent(_fetchedUrl!)}'
@@ -342,141 +309,267 @@ class _PostCardState extends State<_PostCard> {
       return Image.network(
         displayUrl,
         width: double.infinity,
-        height: 200,
+        height: 180,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stack) {
-          if (kDebugMode) print('[Comunidade] erro: $error | url: $_fetchedUrl');
-          return _fallback();
+        errorBuilder: (_, error, __) {
+          if (kDebugMode) print('[Comunidade] erro: $error');
+          return _fallback(post);
         },
       );
     }
-
-    return _fallback();
+    return _fallback(post);
   }
 
-  Widget _fallback() {
+  Widget _fallback(Map<String, dynamic> post) {
     return Container(
       width: double.infinity,
-      height: 200,
+      height: 180,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [widget.hexToColor(widget.colorStart), widget.hexToColor(widget.colorEnd)],
+          colors: [widget.hexToColor(post['colorStart'] as String), widget.hexToColor(post['colorEnd'] as String)],
         ),
       ),
       alignment: Alignment.center,
-      child: Text(widget.emoji, style: const TextStyle(fontSize: 90)),
+      child: Text(post['emoji'] as String, style: const TextStyle(fontSize: 90)),
     );
+  }
+}
+
+// ── Card para receitas do usuário (Firestore) ──────────────────
+
+class _RecipePostCard extends StatelessWidget {
+  final Recipe recipe;
+  final bool liked;
+  final bool saved;
+  final VoidCallback onLike;
+  final VoidCallback onSave;
+  final VoidCallback onVerReceita;
+
+  const _RecipePostCard({
+    required this.recipe,
+    required this.liked,
+    required this.saved,
+    required this.onLike,
+    required this.onSave,
+    required this.onVerReceita,
+  });
+
+  Color _hexToColor(String hex) {
+    final h = hex.replaceAll('#', '');
+    return Color(int.parse('FF$h', radix: 16));
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: widget.onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
+    return _PostCard(
+      id: recipe.id,
+      user: recipe.author ?? 'Você',
+      posted: 'recentemente',
+      emoji: recipe.emoji,
+      title: recipe.title,
+      desc: '',
+      timeReceita: recipe.time,
+      diff: recipe.difficulty,
+      servings: recipe.servings,
+      rating: recipe.rating,
+      likes: liked ? 1 : 0,
+      liked: liked,
+      saved: saved,
+      onLike: onLike,
+      onSave: onSave,
+      onVerReceita: onVerReceita,
+      imageWidget: Container(
+        width: double.infinity,
+        height: 180,
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: context.borderColor)),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [_hexToColor(recipe.colorStart), _hexToColor(recipe.colorEnd)],
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: context.chipColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      _initials(widget.user),
-                      style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.user,
-                          style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: context.textColor,
-                          ),
-                        ),
-                        Text(
-                          widget.time,
-                          style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            color: context.mutedColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(Icons.more_horiz, size: 20, color: context.mutedColor),
-                ],
-              ),
-            ),
-            _buildImage(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.title,
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      color: context.textColor,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      _ActionBtn(
-                        icon: widget.liked ? Icons.favorite : Icons.favorite_border,
-                        label: '${widget.likes}',
-                        active: widget.liked,
-                        onTap: widget.onLike,
-                      ),
-                      const SizedBox(width: 16),
-                      _ActionBtn(
-                        icon: Icons.chat_bubble_outline,
-                        label: '${widget.comments}',
-                        active: false,
-                        onTap: () {},
-                      ),
-                      const SizedBox(width: 16),
-                      _ActionBtn(
-                        icon: Icons.share_outlined,
-                        label: 'Compartilhar',
-                        active: false,
-                        onTap: () {},
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+        alignment: Alignment.center,
+        child: Text(recipe.emoji, style: const TextStyle(fontSize: 90)),
       ),
     );
   }
+}
+
+// ── Widget base de card ────────────────────────────────────────
+
+class _PostCard extends StatelessWidget {
+  final String id;
+  final String user;
+  final String posted;
+  final String emoji;
+  final String title;
+  final String desc;
+  final String timeReceita;
+  final String diff;
+  final String servings;
+  final double rating;
+  final int likes;
+  final bool liked;
+  final bool saved;
+  final VoidCallback onLike;
+  final VoidCallback onSave;
+  final VoidCallback? onVerReceita;
+  final Widget imageWidget;
+
+  const _PostCard({
+    required this.id,
+    required this.user,
+    required this.posted,
+    required this.emoji,
+    required this.title,
+    required this.desc,
+    required this.timeReceita,
+    required this.diff,
+    required this.servings,
+    required this.rating,
+    required this.likes,
+    required this.liked,
+    required this.saved,
+    required this.onLike,
+    required this.onSave,
+    required this.onVerReceita,
+    required this.imageWidget,
+  });
+
+  String _initials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    return name.isNotEmpty ? name[0].toUpperCase() : '?';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: context.cardColor,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [BoxShadow(color: Color(0x1AD4623A), blurRadius: 12, offset: Offset(0, 2))],
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Autor
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 32, height: 32,
+                  decoration: const BoxDecoration(gradient: AppColors.primaryGradient, shape: BoxShape.circle),
+                  alignment: Alignment.center,
+                  child: Text(_initials(user),
+                      style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(user, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 12, color: context.textColor)),
+                    Text('publicou há $posted', style: GoogleFonts.poppins(fontSize: 10, color: context.mutedColor)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Imagem com badge de rating
+          Stack(
+            children: [
+              imageWidget,
+              if (rating > 0)
+                Positioned(
+                  top: 10, right: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withAlpha(128),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text('⭐ $rating',
+                        style: GoogleFonts.poppins(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+            ],
+          ),
+          // Info
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 15, color: context.textColor)),
+                if (desc.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(desc,
+                      style: GoogleFonts.poppins(fontSize: 12, color: context.mutedColor, height: 1.5),
+                      maxLines: 2, overflow: TextOverflow.ellipsis),
+                ],
+                if (timeReceita.isNotEmpty || diff.isNotEmpty || servings.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8, runSpacing: 6,
+                    children: [
+                      if (timeReceita.isNotEmpty) _metaChip('⏱ $timeReceita', context),
+                      if (diff.isNotEmpty) _metaChip('🔥 $diff', context),
+                      if (servings.isNotEmpty) _metaChip('🍽 $servings', context),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Divider(height: 1, color: context.borderColor),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(child: _ActionBtn(
+                      icon: liked ? Icons.favorite : Icons.favorite_border,
+                      label: '$likes',
+                      active: liked,
+                      onTap: onLike,
+                    )),
+                    Container(width: 1, height: 18, color: context.borderColor),
+                    Expanded(child: _ActionBtn(
+                      icon: saved ? Icons.bookmark : Icons.bookmark_border,
+                      label: 'Salvar',
+                      active: saved,
+                      onTap: onSave,
+                    )),
+                    Container(width: 1, height: 18, color: context.borderColor),
+                    Expanded(child: _ActionBtn(
+                      icon: Icons.arrow_forward,
+                      label: 'Ver receita',
+                      active: false,
+                      onTap: onVerReceita ?? () {},
+                    )),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Widget _metaChip(String label, BuildContext context) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+    decoration: BoxDecoration(
+      color: context.chipColor,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Text(label,
+        style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w500, color: context.textColor)),
+  );
 }
 
 class _ActionBtn extends StatelessWidget {
@@ -485,33 +578,24 @@ class _ActionBtn extends StatelessWidget {
   final bool active;
   final VoidCallback onTap;
 
-  const _ActionBtn({
-    required this.icon,
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
+  const _ActionBtn({required this.icon, required this.label, required this.active, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    final color = active ? AppColors.primary : context.mutedColor;
     return GestureDetector(
       onTap: onTap,
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: 20,
-            color: active ? AppColors.primary : context.mutedColor,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: active ? AppColors.primary : context.mutedColor,
-            ),
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 6),
+            Text(label,
+                style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+          ],
+        ),
       ),
     );
   }

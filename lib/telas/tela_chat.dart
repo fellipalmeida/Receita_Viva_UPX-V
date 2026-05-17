@@ -1,5 +1,8 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 import '../tema/tema_app.dart';
 import '../modelos/receita.dart';
 import '../servicos/servico_gemini.dart';
@@ -20,10 +23,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   final _storage = StorageService();
   final _inputCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
+  final _imagePicker = ImagePicker();
+  final _speech = SpeechToText();
 
   final List<_Msg> _messages = [];
   bool _showTyping = false;
   bool _hasInput = false;
+  bool _isListening = false;
+  bool _speechAvailable = false;
   List<String> _alergias = [];
   List<String> _dietas = [];
 
@@ -56,6 +63,18 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           'Olá, Chef! 👨‍🍳 Sou o Chef IA. Posso criar receitas com os ingredientes que você tem, responder dúvidas e personalizar pratos para você. Como posso ajudar?',
     ));
     _loadPreferences();
+    _initSpeech();
+  }
+
+  Future<void> _initSpeech() async {
+    _speechAvailable = await _speech.initialize(
+      onStatus: (status) {
+        if (mounted && (status == 'done' || status == 'notListening')) {
+          setState(() => _isListening = false);
+        }
+      },
+    );
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadPreferences() async {
@@ -103,7 +122,75 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     });
   }
 
+  Future<void> _pickImage() async {
+    final picked = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+    );
+    if (picked == null || !mounted) return;
+    final bytes = await picked.readAsBytes();
+    await _sendImage(bytes);
+  }
+
+  Future<void> _sendImage(Uint8List imageBytes) async {
+    if (!_apiKeySet) { _showApiKeyDialog(); return; }
+    setState(() {
+      _messages.add(_Msg.userImage(imageBytes: imageBytes));
+      _showTyping = true;
+    });
+    _startDots();
+    _scrollBottom();
+    try {
+      final recipe = await _gemini.analyzeImage(imageBytes, alergias: _alergias, dietas: _dietas);
+      await _storage.addToHistory(recipe);
+      await _storage.addNotification(icon: '🤖', text: 'Chef IA criou "${recipe.title}" para você!');
+      if (mounted) {
+        _stopDots();
+        setState(() { _showTyping = false; _messages.add(_Msg.recipe(recipe: recipe)); });
+        _scrollBottom();
+      }
+    } catch (_) {
+      if (mounted) {
+        _stopDots();
+        setState(() { _showTyping = false; _messages.add(_Msg.ai(text: '⚠️ Não consegui analisar a imagem. Tente novamente.')); });
+        _scrollBottom();
+      }
+    }
+  }
+
+  Future<void> _toggleMic() async {
+    if (!_speechAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Microfone não disponível', style: GoogleFonts.poppins(fontSize: 13)),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
+      return;
+    }
+    if (_isListening) {
+      await _speech.stop();
+      setState(() => _isListening = false);
+    } else {
+      setState(() => _isListening = true);
+      await _speech.listen(
+        onResult: (result) {
+          setState(() {
+            _inputCtrl.text = result.recognizedWords;
+            _hasInput = result.recognizedWords.isNotEmpty;
+          });
+        },
+        localeId: 'pt_BR',
+        listenFor: const Duration(seconds: 30),
+        pauseFor: const Duration(seconds: 3),
+      );
+    }
+  }
+
   Future<void> _send([String? text]) async {
+    if (_isListening) {
+      await _speech.stop();
+      if (mounted) setState(() => _isListening = false);
+    }
     final msg = (text ?? _inputCtrl.text).trim();
     if (msg.isEmpty) return;
     if (!_apiKeySet) {
@@ -232,14 +319,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                       ],
                     ),
                   ),
-                  Container(
-                    width: 34, height: 34,
-                    decoration: BoxDecoration(
-                      color: context.chipColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.more_vert, size: 18, color: context.mutedColor),
-                  ),
                 ],
               ),
             ),
@@ -302,7 +381,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             // Input bar
             Container(
               padding: EdgeInsets.fromLTRB(
-                  12, 8, 12, MediaQuery.of(context).padding.bottom + 8),
+                  12, 6, 12, MediaQuery.of(context).padding.bottom + 6),
               decoration: BoxDecoration(
                 color: context.cardColor,
                 border: Border(top: BorderSide(color: context.borderColor)),
@@ -310,13 +389,16 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Container(
-                    width: 40, height: 40,
-                    decoration: BoxDecoration(
-                      color: context.chipColor,
-                      shape: BoxShape.circle,
+                  GestureDetector(
+                    onTap: _pickImage,
+                    child: Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(
+                        color: context.chipColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.attach_file, size: 18, color: context.mutedColor),
                     ),
-                    child: Icon(Icons.attach_file, size: 18, color: context.mutedColor),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -324,7 +406,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                       constraints: const BoxConstraints(maxHeight: 120),
                       decoration: BoxDecoration(
                         color: context.inputColor,
-                        borderRadius: BorderRadius.circular(22),
+                        borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: context.borderColor, width: 1.5),
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -343,9 +425,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                           focusedBorder: InputBorder.none,
                           filled: false,
                           isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                          suffixIcon: Icon(Icons.sentiment_satisfied_alt_outlined,
-                              size: 18, color: context.mutedColor),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 7),
+                          suffixIconConstraints: const BoxConstraints(minHeight: 32, minWidth: 32),
                         ),
                         onChanged: (v) => setState(() => _hasInput = v.trim().isNotEmpty),
                         onSubmitted: (_) => _send(),
@@ -354,22 +435,33 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   ),
                   const SizedBox(width: 8),
                   GestureDetector(
-                    onTap: _send,
-                    child: Container(
-                      width: 42, height: 42,
-                      decoration: const BoxDecoration(
-                        gradient: AppColors.primaryGradient,
+                    onTap: _hasInput ? _send : _toggleMic,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 38, height: 38,
+                      decoration: BoxDecoration(
+                        gradient: _isListening
+                            ? const LinearGradient(
+                                colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                            : AppColors.primaryGradient,
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Color(0x55D4623A),
+                            color: _isListening
+                                ? const Color(0x55EF4444)
+                                : const Color(0x55D4623A),
                             blurRadius: 14,
-                            offset: Offset(0, 4),
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
                       child: Icon(
-                        _hasInput ? Icons.send_rounded : Icons.mic_none,
+                        _hasInput
+                            ? Icons.send_rounded
+                            : (_isListening ? Icons.mic : Icons.mic_none),
                         color: Colors.white,
                         size: 20,
                       ),
@@ -385,6 +477,31 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildMessage(_Msg msg) {
+    if (msg.isUser && msg.imageBytes != null) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(18),
+                topRight: Radius.circular(18),
+                bottomLeft: Radius.circular(18),
+                bottomRight: Radius.circular(4),
+              ),
+              child: Image.memory(
+                msg.imageBytes!,
+                width: MediaQuery.of(context).size.width * 0.6,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text('✓ Agora', style: GoogleFonts.poppins(fontSize: 10, color: context.mutedColor)),
+          ],
+        ),
+      );
+    }
     if (msg.isUser) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 6),
@@ -415,7 +532,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 2),
             Text(
-              '✓✓ Agora',
+              '✓ Agora',
               style: GoogleFonts.poppins(fontSize: 10, color: context.mutedColor),
             ),
           ],
@@ -744,10 +861,12 @@ class _Msg {
   final bool isUser;
   final String? text;
   final Recipe? recipe;
+  final Uint8List? imageBytes;
 
-  const _Msg._({required this.isUser, this.text, this.recipe});
+  const _Msg._({required this.isUser, this.text, this.recipe, this.imageBytes});
 
   factory _Msg.user({required String text}) => _Msg._(isUser: true, text: text);
+  factory _Msg.userImage({required Uint8List imageBytes}) => _Msg._(isUser: true, imageBytes: imageBytes);
   factory _Msg.ai({required String text}) => _Msg._(isUser: false, text: text);
   factory _Msg.recipe({required Recipe recipe}) => _Msg._(isUser: false, recipe: recipe);
 }

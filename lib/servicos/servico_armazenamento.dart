@@ -13,6 +13,7 @@ class StorageService {
   static const _notifCountKey = 'notif_unread_count';
   static const _passwordKey = 'user_password';
   static const _realNotificationsKey = 'real_notifications';
+  static const _listaComprasKey = 'lista_compras';
 
   // ── Onboarding ─────────────────────────────────────────────
   Future<bool> isOnboardingDone() async {
@@ -180,5 +181,22 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_realNotificationsKey);
     await prefs.setInt(_notifCountKey, 0);
+  }
+
+  // ── Lista de Compras ───────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getListaCompras() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_listaComprasKey) ?? [];
+    return list
+        .map((s) => Map<String, dynamic>.from(jsonDecode(s) as Map))
+        .toList();
+  }
+
+  Future<void> saveListaCompras(List<Map<String, dynamic>> items) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      _listaComprasKey,
+      items.map(jsonEncode).toList(),
+    );
   }
 }

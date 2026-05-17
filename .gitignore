@@ -47,5 +47,17 @@ app.*.map.json
 # Chaves de API
 lib/config.dart
 
+# Firebase — credenciais e configurações (NUNCA subir)
+lib/firebase_options.dart
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+macos/Runner/GoogleService-Info.plist
+.firebaserc
+firebase.json
+
 # Design
 design_handoff_receita_viva/
+design_handoff_receita_viva_2/
+
+# Claude Code
+CLAUDE.md

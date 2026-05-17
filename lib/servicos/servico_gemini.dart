@@ -1,4 +1,5 @@
 ﻿import 'dart:convert';
+import 'dart:typed_data';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../config.dart';
 import '../modelos/receita.dart';
@@ -101,6 +102,74 @@ Inclua pelo menos 4 ingredientes e 3 passos.''';
         query: isIngredients ? 'Ingredientes: $query' : query,
         createdAt: DateTime.now(),
         content: '⚠️ Não foi possível gerar a receita. Verifique sua conexão e tente novamente.',
+      );
+    }
+  }
+
+  Future<Recipe> analyzeImage(
+    Uint8List imageBytes, {
+    List<String> alergias = const [],
+    List<String> dietas = const [],
+  }) async {
+    final restricoes = StringBuffer();
+    if (alergias.isNotEmpty) {
+      restricoes.writeln('RESTRIÇÕES OBRIGATÓRIAS: NÃO use: ${alergias.join(', ')}.');
+    }
+    if (dietas.isNotEmpty) {
+      restricoes.writeln('DIETA: ${dietas.join(', ')}.');
+    }
+
+    final prompt = '''Você é um Chef de Cozinha. Analise a imagem, identifique os ingredientes visíveis e crie uma receita completa em Português Brasileiro.${restricoes.isNotEmpty ? '\n${restricoes.toString().trim()}' : ''}
+
+Responda SOMENTE com JSON válido, sem texto extra:
+{
+  "title": "Nome da Receita em Português",
+  "title_en": "Dish Name in English",
+  "time": "X min",
+  "servings": "X porções",
+  "difficulty": "Fácil",
+  "emoji": "🍳",
+  "category": "Carnes",
+  "ingredients": ["ingrediente 1 com quantidade", "ingrediente 2"],
+  "steps": ["Passo 1 completo", "Passo 2"]
+}
+
+Categorias válidas: Carnes, Massas, Bebidas, Lanches, Doces, Frutos do Mar, Saladas, Sopas, Outros
+Dificuldades válidas: Fácil, Médio, Difícil''';
+
+    try {
+      final imagePart = DataPart('image/jpeg', imageBytes);
+      final textPart = TextPart(prompt);
+      final response = await _model.generateContent([Content.multi([textPart, imagePart])]);
+      final text = response.text ?? '';
+      final jsonStr = _extractJson(text);
+      final data = jsonDecode(jsonStr) as Map<String, dynamic>;
+      final colors = _categoryColors(data['category'] as String? ?? 'Outros');
+      final id = DateTime.now().millisecondsSinceEpoch.toString();
+      return Recipe(
+        id: id,
+        title: data['title'] as String? ?? 'Receita da Imagem',
+        titleEn: data['title_en'] as String?,
+        query: 'Receita por imagem',
+        createdAt: DateTime.now(),
+        time: data['time'] as String? ?? '30 min',
+        servings: data['servings'] as String? ?? '4 porções',
+        difficulty: data['difficulty'] as String? ?? 'Médio',
+        rating: 4.5,
+        emoji: data['emoji'] as String? ?? '🍳',
+        colorStart: colors.$1,
+        colorEnd: colors.$2,
+        category: data['category'] as String? ?? 'Outros',
+        ingredients: (data['ingredients'] as List<dynamic>?)?.cast<String>() ?? [],
+        steps: (data['steps'] as List<dynamic>?)?.cast<String>() ?? [],
+      );
+    } catch (_) {
+      return Recipe(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        title: 'Receita da Imagem',
+        query: 'Receita por imagem',
+        createdAt: DateTime.now(),
+        content: '⚠️ Não consegui analisar a imagem. Tente novamente.',
       );
     }
   }

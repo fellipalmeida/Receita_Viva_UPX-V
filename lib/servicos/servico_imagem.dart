@@ -10,6 +10,8 @@ class FoodImageService {
   bool get _keySet => spoonacularApiKey != 'SUA_CHAVE_AQUI';
 
   Future<String?> fetchImage(String recipeId, String query) async {
+    return null; // Spoonacular desativado temporariamente
+    // ignore: dead_code
     if (!_keySet) return null;
     if (cache.containsKey(recipeId)) return cache[recipeId];
 

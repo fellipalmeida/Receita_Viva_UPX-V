@@ -4,14 +4,14 @@ import '../tema/tema_app.dart';
 import '../modelos/receita.dart';
 import '../servicos/servico_armazenamento.dart';
 import 'tela_receita.dart';
-import 'tela_favoritos.dart';
-import 'tela_historico.dart';
 import 'tela_editar_perfil.dart';
 import 'tela_configuracoes.dart';
 import 'tela_suporte.dart';
 import 'tela_login.dart';
 import 'tela_foto_picker.dart';
-import 'menu_sheet.dart';
+import 'tela_seguidores.dart';
+import '../main.dart';
+import '../servicos/servico_auth.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -24,13 +24,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _storage = StorageService();
   String _name = 'Chef';
   String _email = '';
+  String _bio = '';
   int? _avatarIndex;
   int _recipesCount = 0;
-  int _favoritesCount = 0;
-  int _publishedCount = 0;
   List<Recipe> _publishedRecipes = [];
-  String _tab = 'receitas';
   bool _loading = true;
+  bool _showMenu = false;
 
   @override
   void initState() {
@@ -41,26 +40,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _load() async {
     final profile = await _storage.getProfile();
     final history = await _storage.getHistory();
-    final favorites = await _storage.getFavorites();
     final published = await _storage.getCommunityRecipes();
     if (mounted) {
       setState(() {
         _name = profile?.name ?? 'Chef';
         _email = profile?.email ?? '';
+        _bio = profile?.bio ?? '';
         _avatarIndex = profile?.avatarIndex;
         _recipesCount = history.length;
-        _favoritesCount = favorites.length;
-        _publishedCount = published.length;
         _publishedRecipes = published;
         _loading = false;
       });
     }
   }
 
-  Color _hexToColor(String hex) {
-    final h = hex.replaceAll('#', '');
-    return Color(int.parse('FF$h', radix: 16));
-  }
+  String get _handle => _email.isNotEmpty ? '@${_email.split('@').first}' : '@chef';
 
   String get _initials {
     final parts = _name.trim().split(' ');
@@ -68,399 +62,540 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return _name.isNotEmpty ? _name[0].toUpperCase() : 'C';
   }
 
+  Future<void> _logout() async {
+    await AuthService().sair();
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (_) => false,
+      );
+    }
+  }
+
+  void _openEditProfile() {
+    setState(() => _showMenu = false);
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaEditarPerfil()))
+        .then((updated) { if (updated == true) _load(); });
+  }
+
+  void _openSettings() {
+    setState(() => _showMenu = false);
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaConfiguracoes()));
+  }
+
+  void _openSupport() {
+    setState(() => _showMenu = false);
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaSuporte()));
+  }
+
+  Color _hexToColor(String hex) {
+    final h = hex.replaceAll('#', '');
+    return Color(int.parse('FF$h', radix: 16));
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: AppColors.primary)));
     }
 
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.bottomCenter,
-                children: [
-                  Container(
-                    height: 100,
+      body: Stack(
+        children: [
+          _buildContent(),
+          if (_showMenu) _buildMenuOverlay(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          _buildCover(),
+          _buildAvatar(),
+          const SizedBox(height: 14),
+          _buildNameBio(),
+          const SizedBox(height: 18),
+          _buildStats(),
+          const SizedBox(height: 18),
+          _buildMinhasReceitas(),
+          const SizedBox(height: 100),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCover() {
+    return SizedBox(
+      height: 75,
+      child: Stack(
+        children: [
+          Container(
+            height: 75,
+            decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
+            child: Stack(
+              children: [
+                Positioned(
+                  top: -10, right: -20,
+                  child: Container(
+                    width: 80, height: 80,
                     decoration: const BoxDecoration(
-                      gradient: AppColors.primaryGradient,
+                      shape: BoxShape.circle,
+                      color: Color(0x1EFFFFFF),
                     ),
                   ),
-                  Positioned(
-                    bottom: -44,
-                    child: Container(
-                      width: 88, height: 88,
-                      decoration: BoxDecoration(
-                        gradient: _avatarIndex != null
-                            ? LinearGradient(
-                                colors: [
-                                  TelaFotoPicker.fotos[_avatarIndex!][0] as Color,
-                                  TelaFotoPicker.fotos[_avatarIndex!][1] as Color,
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              )
-                            : AppColors.primaryGradient,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: context.appBg, width: 4),
-                      ),
-                      alignment: Alignment.center,
-                      child: _avatarIndex != null
-                          ? Text(
-                              TelaFotoPicker.fotos[_avatarIndex!][2] as String,
-                              style: const TextStyle(fontSize: 40),
-                            )
-                          : Text(
-                              _initials,
-                              style: GoogleFonts.poppins(
-                                fontSize: 32,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
+                ),
+                Positioned(
+                  bottom: -30, left: 20,
+                  child: Container(
+                    width: 60, height: 60,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0x14FFFFFF),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 56),
-              // Nome
-              Text(
-                _name,
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: context.textColor,
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                _email.isNotEmpty ? '@${_email.split('@').first}' : '@chef',
-                style: GoogleFonts.poppins(fontSize: 12, color: context.mutedColor),
-              ),
-              const SizedBox(height: 16),
-              // Stats
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _Stat(value: '$_recipesCount', label: 'Receitas'),
-                    _statDivider(context),
-                    _Stat(value: '$_favoritesCount', label: 'Favoritos'),
-                    _statDivider(context),
-                    _Stat(value: '$_publishedCount', label: 'Publicadas'),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Botão editar
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        height: 40,
-                        decoration: BoxDecoration(
-                          gradient: AppColors.primaryGradient,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x33D4623A),
-                              blurRadius: 12,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(12),
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const TelaEditarPerfil(),
-                              ),
-                            ).then((atualizado) {
-                              if (atualizado == true) _load();
-                            }),
-                            child: Center(
-                              child: Text(
-                                'Editar perfil',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    GestureDetector(
-                      onTap: () => mostrarMenuSheet(
-                        context,
-                        nome: _name,
-                        email: _email,
-                        onLogout: () => Navigator.of(context)
-                            .pushAndRemoveUntil(
-                          MaterialPageRoute(builder: (_) => const LoginScreen()),
-                          (_) => false,
-                        ),
-                        onHistorico: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const HistoryScreen()),
-                        ).then((_) => _load()),
-                        onFavoritos: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const FavoritesScreen()),
-                        ).then((_) => _load()),
-                        onConfiguracoes: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const TelaConfiguracoes()),
-                        ),
-                        onSuporte: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const TelaSuporte()),
-                        ),
-                        onEditarPerfil: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const TelaEditarPerfil()),
-                        ).then((atualizado) {
-                          if (atualizado == true) _load();
-                        }),
-                      ),
-                      child: Container(
-                        width: 40, height: 40,
-                        decoration: BoxDecoration(
-                          color: context.cardColor,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: context.borderColor),
-                        ),
-                        child: Icon(Icons.more_horiz, size: 18, color: context.textColor),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Atalhos
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _ShortcutBtn(
-                        label: 'Favoritos ❤️',
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const FavoritesScreen()),
-                        ).then((_) => _load()),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _ShortcutBtn(
-                        label: 'Histórico 📋',
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const HistoryScreen()),
-                        ).then((_) => _load()),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Abas
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    _TabItem(
-                      label: 'receitas',
-                      active: _tab == 'receitas',
-                      onTap: () => setState(() => _tab = 'receitas'),
-                    ),
-                    _TabItem(
-                      label: 'curtidas',
-                      active: _tab == 'curtidas',
-                      onTap: () => setState(() => _tab = 'curtidas'),
-                    ),
-                  ],
-                ),
-              ),
-              Divider(color: context.borderColor, height: 1),
-              // Grid de receitas
-              _publishedRecipes.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.all(40),
-                      child: Column(
-                        children: [
-                          const Text('🍳', style: TextStyle(fontSize: 48)),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Nenhuma receita publicada ainda',
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              color: context.mutedColor,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    )
-                  : GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      padding: EdgeInsets.zero,
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 2,
-                        mainAxisSpacing: 2,
-                      ),
-                      itemCount: _publishedRecipes.length,
-                      itemBuilder: (_, i) {
-                        final recipe = _publishedRecipes[i];
-                        return GestureDetector(
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => RecipeScreen(recipe: recipe)),
-                          ),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  _hexToColor(recipe.colorStart),
-                                  _hexToColor(recipe.colorEnd),
-                                ],
-                              ),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              recipe.emoji,
-                              style: const TextStyle(fontSize: 36),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-              const SizedBox(height: 100),
-            ],
+              ],
+            ),
           ),
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 14, top: 8),
+                child: GestureDetector(
+                  onTap: () => setState(() => _showMenu = true),
+                  child: Container(
+                    width: 34, height: 34,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(56),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.more_vert, color: Colors.white, size: 18),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatar() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Center(
+        child: Container(
+          width: 108, height: 108,
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            color: context.appBg,
+            shape: BoxShape.circle,
+            boxShadow: [BoxShadow(color: AppColors.primary.withAlpha(51), blurRadius: 20, offset: const Offset(0, 6))],
+          ),
+          child: _avatarIndex != null
+              ? Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        TelaFotoPicker.fotos[_avatarIndex!][0] as Color,
+                        TelaFotoPicker.fotos[_avatarIndex!][1] as Color,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    TelaFotoPicker.fotos[_avatarIndex!][2] as String,
+                    style: const TextStyle(fontSize: 52),
+                  ),
+                )
+              : Container(
+                  decoration: const BoxDecoration(gradient: AppColors.primaryGradient, shape: BoxShape.circle),
+                  alignment: Alignment.center,
+                  child: Text(
+                    _initials,
+                    style: GoogleFonts.poppins(fontSize: 38, fontWeight: FontWeight.w700, color: Colors.white),
+                  ),
+                ),
         ),
       ),
     );
   }
 
-  Widget _statDivider(BuildContext context) => Container(
-        width: 1,
-        height: 36,
-        color: context.borderColor,
-      );
-}
+  Widget _buildNameBio() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Column(
+        children: [
+          Text(
+            _name,
+            style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w700, color: context.textColor, letterSpacing: -0.3),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            _handle,
+            style: GoogleFonts.poppins(fontSize: 12, color: context.mutedColor),
+          ),
+          if (_bio.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              _bio,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(fontSize: 13, color: context.textColor, height: 1.55),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
-class _Stat extends StatelessWidget {
-  final String value;
-  final String label;
-
-  const _Stat({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
+  Widget _buildStats() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          value,
-          style: GoogleFonts.poppins(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: context.textColor,
+        _StatBtn(
+          value: '$_recipesCount',
+          label: 'Receitas',
+          onTap: null,
+        ),
+        _Divider(),
+        _StatBtn(
+          value: '${_publishedRecipes.length}',
+          label: 'Seguidores',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const TelaSeguidores(titulo: 'Seguidores')),
           ),
         ),
-        Text(
-          label,
-          style: GoogleFonts.poppins(fontSize: 11, color: context.mutedColor),
+        _Divider(),
+        _StatBtn(
+          value: '0',
+          label: 'Seguindo',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const TelaSeguidores(titulo: 'Seguindo', modoSeguindo: true)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMinhasReceitas() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('Minhas Receitas',
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 15, color: context.textColor)),
+              const Spacer(),
+              Text('${_publishedRecipes.length} publicadas',
+                  style: GoogleFonts.poppins(fontSize: 11, color: context.mutedColor)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _publishedRecipes.isEmpty
+              ? _buildEmptyGrid()
+              : _buildGrid(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyGrid() {
+    return Container(
+      padding: const EdgeInsets.all(40),
+      alignment: Alignment.center,
+      child: Column(
+        children: [
+          const Text('📝', style: TextStyle(fontSize: 40)),
+          const SizedBox(height: 8),
+          Text(
+            'Você ainda não publicou nenhuma receita',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(fontSize: 13, color: context.mutedColor),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGrid() {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 0.9,
+      ),
+      itemCount: _publishedRecipes.length,
+      itemBuilder: (_, i) {
+        final recipe = _publishedRecipes[i];
+        return GestureDetector(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => RecipeScreen(recipe: recipe)),
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: context.cardColor,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: const [BoxShadow(color: Color(0x1AD4623A), blurRadius: 8, offset: Offset(0, 2))],
+            ),
+            clipBehavior: Clip.hardEdge,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AspectRatio(
+                  aspectRatio: 1.1,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [_hexToColor(recipe.colorStart), _hexToColor(recipe.colorEnd)],
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(recipe.emoji, style: const TextStyle(fontSize: 48)),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        recipe.title,
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 12, color: context.textColor, height: 1.3),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '⏱ ${recipe.time} · ⭐ ${recipe.rating}',
+                        style: GoogleFonts.poppins(fontSize: 10, color: context.mutedColor),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMenuOverlay() {
+    return Stack(
+      children: [
+        GestureDetector(
+          onTap: () => setState(() => _showMenu = false),
+          child: Container(color: Colors.black.withAlpha(102)),
+        ),
+        Positioned(
+          bottom: 0, left: 0, right: 0,
+          child: _MenuSheet(
+            isDark: themeNotifier.value == ThemeMode.dark,
+            onClose: () => setState(() => _showMenu = false),
+            onToggleDark: () {
+              themeNotifier.value = themeNotifier.value == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+              setState(() {});
+            },
+            onEditarPerfil: _openEditProfile,
+            onConfiguracoes: _openSettings,
+            onSuporte: _openSupport,
+            onLogout: _logout,
+          ),
         ),
       ],
     );
   }
 }
 
-class _ShortcutBtn extends StatelessWidget {
+class _StatBtn extends StatelessWidget {
+  final String value;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
-  const _ShortcutBtn({required this.label, required this.onTap});
+  const _StatBtn({required this.value, required this.label, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        height: 44,
-        decoration: BoxDecoration(
-          color: context.cardColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: context.borderColor),
-          boxShadow: const [
-            BoxShadow(color: Color(0x0D000000), blurRadius: 4, offset: Offset(0, 2)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          children: [
+            Text(value,
+                style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700, color: context.textColor, letterSpacing: -0.3)),
+            const SizedBox(height: 1),
+            Text(label,
+                style: GoogleFonts.poppins(fontSize: 11, color: context.mutedColor)),
           ],
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: context.textColor,
-          ),
         ),
       ),
     );
   }
 }
 
-class _TabItem extends StatelessWidget {
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
+class _Divider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(width: 1, height: 36, color: context.borderColor);
+  }
+}
 
-  const _TabItem({required this.label, required this.active, required this.onTap});
+class _MenuSheet extends StatelessWidget {
+  final bool isDark;
+  final VoidCallback onClose;
+  final VoidCallback onToggleDark;
+  final VoidCallback onEditarPerfil;
+  final VoidCallback onConfiguracoes;
+  final VoidCallback onSuporte;
+  final VoidCallback onLogout;
+
+  const _MenuSheet({
+    required this.isDark,
+    required this.onClose,
+    required this.onToggleDark,
+    required this.onEditarPerfil,
+    required this.onConfiguracoes,
+    required this.onSuporte,
+    required this.onLogout,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          height: 40,
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: active ? AppColors.primary : Colors.transparent,
-                width: 2.5,
+    return Container(
+      decoration: BoxDecoration(
+        color: context.cardColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 40, offset: Offset(0, -8))],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Container(width: 40, height: 4, decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2))),
+            ),
+            // Dark mode toggle
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(border: Border(bottom: BorderSide(color: context.borderColor))),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(color: context.chipColor, shape: BoxShape.circle),
+                      child: Icon(Icons.dark_mode_outlined, size: 18, color: context.textColor),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text('Modo escuro',
+                          style: GoogleFonts.poppins(fontSize: 14, color: context.textColor)),
+                    ),
+                    GestureDetector(
+                      onTap: onToggleDark,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 48, height: 28,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          color: isDark ? AppColors.primary : context.borderColor,
+                        ),
+                        child: AnimatedAlign(
+                          duration: const Duration(milliseconds: 200),
+                          alignment: isDark ? Alignment.centerRight : Alignment.centerLeft,
+                          child: Container(
+                            margin: const EdgeInsets.all(3),
+                            width: 22, height: 22,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white,
+                              boxShadow: [BoxShadow(color: Color(0x33000000), blurRadius: 4, offset: Offset(0, 1))],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 13,
-              fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-              color: active ? AppColors.primary : context.mutedColor,
+            // Menu items
+            _MenuItem(icon: Icons.edit_outlined, label: 'Editar perfil', onTap: onEditarPerfil),
+            _MenuItem(icon: Icons.settings_outlined, label: 'Configurações', onTap: onConfiguracoes),
+            _MenuItem(icon: Icons.chat_bubble_outline, label: 'Suporte', onTap: onSuporte),
+            // Logout
+            Container(
+              decoration: BoxDecoration(border: Border(top: BorderSide(color: context.borderColor))),
+              child: _MenuItem(
+                icon: Icons.logout,
+                label: 'Sair da conta',
+                color: const Color(0xFFEF4444),
+                onTap: onLogout,
+              ),
             ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color? color;
+  final VoidCallback onTap;
+
+  const _MenuItem({required this.icon, required this.label, required this.onTap, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? context.textColor;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  color: color != null ? const Color(0x22EF4444) : context.chipColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 18, color: c),
+              ),
+              const SizedBox(width: 14),
+              Text(label,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14, color: c,
+                    fontWeight: color != null ? FontWeight.w600 : FontWeight.w400,
+                  )),
+            ],
           ),
         ),
       ),

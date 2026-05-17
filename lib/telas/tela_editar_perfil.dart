@@ -46,6 +46,7 @@ class _TelaEditarPerfilState extends State<TelaEditarPerfil> {
         _nomeCtrl.text = perfil.name;
         _usernameCtrl.text =
             perfil.email.isNotEmpty ? perfil.email.split('@').first : '';
+        _bioCtrl.text = perfil.bio;
         _alergias = List<String>.from(perfil.alergias);
         _avatarIndex = perfil.avatarIndex;
       });
@@ -70,6 +71,7 @@ class _TelaEditarPerfilState extends State<TelaEditarPerfil> {
           ? (_perfilOriginal?.name ?? 'Chef')
           : _nomeCtrl.text.trim(),
       email: _perfilOriginal?.email ?? '',
+      bio: _bioCtrl.text.trim(),
       alergias: _alergias,
       dietas: _perfilOriginal?.dietas ?? [],
       cozinhas: _perfilOriginal?.cozinhas ?? [],

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../tema/tema_app.dart';
 import '../main.dart';
+import 'tela_preferencias.dart';
+import 'tela_lista_compras.dart';
 
 class TelaConfiguracoes extends StatefulWidget {
   const TelaConfiguracoes({super.key});
@@ -125,64 +128,59 @@ class _TelaConfiguracoesState extends State<TelaConfiguracoes> {
                         elevation: 0,
                       ),
                       onPressed: () async {
-                        final prefs = await SharedPreferences.getInstance();
-                        final senhaArmazenada = prefs.getString('senha_usuario') ?? '';
-
-                        if (senhaArmazenada.isNotEmpty &&
-                            senhaAtualCtrl.text != senhaArmazenada) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Senha atual incorreta',
-                                    style: GoogleFonts.poppins(fontSize: 13)),
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12)),
-                              ),
-                            );
-                          }
-                          return;
-                        }
                         if (novaSenhaCtrl.text.length < 6) {
                           if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Nova senha deve ter pelo menos 6 caracteres',
-                                    style: GoogleFonts.poppins(fontSize: 13)),
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12)),
-                              ),
-                            );
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text('Nova senha deve ter pelo menos 6 caracteres',
+                                  style: GoogleFonts.poppins(fontSize: 13)),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ));
                           }
                           return;
                         }
                         if (novaSenhaCtrl.text != confirmarCtrl.text) {
                           if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Senhas não coincidem',
-                                    style: GoogleFonts.poppins(fontSize: 13)),
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12)),
-                              ),
-                            );
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text('Senhas não coincidem',
+                                  style: GoogleFonts.poppins(fontSize: 13)),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ));
                           }
                           return;
                         }
-                        await prefs.setString('senha_usuario', novaSenhaCtrl.text);
-                        if (ctx.mounted) Navigator.pop(ctx);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('✅ Senha alterada com sucesso!',
+                        try {
+                          final user = FirebaseAuth.instance.currentUser;
+                          if (user == null) return;
+                          // Reautenticar antes de mudar senha
+                          final cred = EmailAuthProvider.credential(
+                            email: user.email!,
+                            password: senhaAtualCtrl.text,
+                          );
+                          await user.reauthenticateWithCredential(cred);
+                          await user.updatePassword(novaSenhaCtrl.text);
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text('Senha alterada com sucesso!',
                                   style: GoogleFonts.poppins(fontSize: 13)),
                               behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                            ),
-                          );
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ));
+                          }
+                        } on FirebaseAuthException catch (e) {
+                          String msg = 'Erro ao alterar senha';
+                          if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+                            msg = 'Senha atual incorreta';
+                          }
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text(msg, style: GoogleFonts.poppins(fontSize: 13)),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ));
+                          }
                         }
                       },
                       child: Text(
@@ -329,47 +327,33 @@ class _TelaConfiguracoesState extends State<TelaConfiguracoes> {
                       ],
                     ),
                     _Secao(
-                      titulo: 'Privacidade e segurança',
+                      titulo: 'Cozinha',
+                      filhos: [
+                        _Linha(
+                          icone: '🥗',
+                          label: 'Preferências culinárias',
+                          sub: 'Alergias, dietas e cozinhas favoritas',
+                          direita: Icon(Icons.chevron_right, color: context.mutedColor, size: 20),
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaPreferencias())),
+                        ),
+                        _Linha(
+                          icone: '🛒',
+                          label: 'Lista de compras',
+                          sub: 'Itens das suas receitas salvas',
+                          direita: Icon(Icons.chevron_right, color: context.mutedColor, size: 20),
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaListaCompras())),
+                          borda: false,
+                        ),
+                      ],
+                    ),
+                    _Secao(
+                      titulo: 'Privacidade',
                       filhos: [
                         _Linha(
                           icone: '🔒',
                           label: 'Alterar senha',
                           direita: Icon(Icons.chevron_right, color: context.mutedColor, size: 20),
                           onTap: _alterarSenha,
-                        ),
-                        _Linha(
-                          icone: '👁️',
-                          label: 'Quem pode ver meu perfil',
-                          sub: 'Todos',
-                          direita: Icon(Icons.chevron_right, color: context.mutedColor, size: 20),
-                          onTap: () {},
-                        ),
-                        _Linha(
-                          icone: '🚫',
-                          label: 'Usuários bloqueados',
-                          sub: '0 bloqueados',
-                          direita: Icon(Icons.chevron_right, color: context.mutedColor, size: 20),
-                          onTap: () {},
-                          borda: false,
-                        ),
-                      ],
-                    ),
-                    _Secao(
-                      titulo: 'Dados',
-                      filhos: [
-                        _Linha(
-                          icone: '📦',
-                          label: 'Exportar meus dados',
-                          sub: 'Baixar receitas e histórico',
-                          direita: Icon(Icons.chevron_right, color: context.mutedColor, size: 20),
-                          onTap: () {},
-                        ),
-                        _Linha(
-                          icone: '🗑️',
-                          label: 'Limpar cache',
-                          sub: 'Liberar espaço no dispositivo',
-                          direita: Icon(Icons.chevron_right, color: context.mutedColor, size: 20),
-                          onTap: () {},
                           borda: false,
                         ),
                       ],
@@ -626,7 +610,7 @@ class _Linha extends StatelessWidget {
                 ],
               ),
             ),
-            if (direita != null) direita!,
+            ?direita,
           ],
         ),
       ),

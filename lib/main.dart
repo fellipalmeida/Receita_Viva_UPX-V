@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'firebase_options.dart';
 import 'tema/tema_app.dart';
 import 'servicos/servico_armazenamento.dart';
 import 'telas/tela_onboarding.dart';
@@ -19,6 +22,18 @@ final favoritesNotifier = ValueNotifier<int>(0);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  bool firebaseOk = false;
+  try {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    firebaseOk = true;
+  } catch (_) {}
+
+  if (!firebaseOk) {
+    runApp(const _AppWebNaoSuportado());
+    return;
+  }
+
   final prefs = await SharedPreferences.getInstance();
   final isDark = prefs.getBool('dark_mode') ?? false;
   themeNotifier.value = isDark ? ThemeMode.dark : ThemeMode.light;
@@ -59,14 +74,14 @@ class _SplashState extends State<_Splash> {
   @override
   void initState() {
     super.initState();
-    _check();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _check());
   }
 
   Future<void> _check() async {
-    final storage = StorageService();
-    final profile = await storage.getProfile();
+    final user = FirebaseAuth.instance.currentUser;
     if (!mounted) return;
-    if (profile != null) {
+    if (user != null) {
+      final storage = StorageService();
       final done = await storage.isOnboardingDone();
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -266,4 +281,80 @@ class _NavItem {
   final String label;
 
   const _NavItem({required this.id, required this.label});
+}
+
+class _AppWebNaoSuportado extends StatelessWidget {
+  const _AppWebNaoSuportado();
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: const Color(0xFFFFF8F5),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFD4623A), Color(0xFFF5A34E)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x55D4623A), blurRadius: 20, offset: Offset(0, 6)),
+                  ],
+                ),
+                child: const Icon(Icons.local_fire_department, color: Colors.white, size: 40),
+              ),
+              const SizedBox(height: 24),
+              RichText(
+                text: TextSpan(children: [
+                  TextSpan(
+                    text: 'Receita',
+                    style: GoogleFonts.poppins(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1A1A1A),
+                    ),
+                  ),
+                  TextSpan(
+                    text: ' Viva',
+                    style: GoogleFonts.poppins(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w400,
+                      color: const Color(0xFFD4623A),
+                    ),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Disponível apenas no Android',
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF666666),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Abra o app no emulador ou dispositivo Android.',
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  color: const Color(0xFF999999),
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -1,9 +1,10 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../modelos/perfil_usuario.dart';
 import '../servicos/servico_armazenamento.dart';
+import '../servicos/servico_auth.dart';
 import '../tema/tema_app.dart';
-import '../main.dart';
 import 'tela_foto_picker.dart';
 import 'tela_onboarding.dart';
 
@@ -32,6 +33,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
   int? _avatarIndex;
 
   final _storage = StorageService();
+  bool _loading = false;
 
   static const _titles = ['Seus dados', 'Sua senha', 'Preferências', 'Foto de perfil'];
 
@@ -122,24 +124,39 @@ class _CadastroScreenState extends State<CadastroScreen> {
   }
 
   Future<void> _finish() async {
-    final profile = UserProfile(
-      name: _nameCtrl.text.trim(),
-      email: _emailCtrl.text.trim(),
-      alergias: List.from(_alergias),
-      dietas: List.from(_dietas),
-      cozinhas: List.from(_cozinhas),
-      avatarIndex: _avatarIndex,
-    );
-    await _storage.saveProfile(profile);
-    await _storage.savePassword(_passwordCtrl.text);
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-        (route) => false,
+    setState(() => _loading = true);
+    try {
+      await AuthService().cadastrar(_emailCtrl.text.trim(), _passwordCtrl.text);
+      final profile = UserProfile(
+        name: _nameCtrl.text.trim(),
+        email: _emailCtrl.text.trim(),
+        alergias: List.from(_alergias),
+        dietas: List.from(_dietas),
+        cozinhas: List.from(_cozinhas),
+        avatarIndex: _avatarIndex,
       );
+      await _storage.saveProfile(profile);
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+          (route) => false,
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) _snack(_authError(e.code));
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
+
+  String _authError(String code) => switch (code) {
+    'email-already-in-use' => 'Este e-mail já está em uso',
+    'invalid-email' => 'E-mail inválido',
+    'weak-password' => 'Senha muito fraca (mínimo 6 caracteres)',
+    'network-request-failed' => 'Sem conexão com a internet',
+    _ => 'Erro ao criar conta. Tente novamente.',
+  };
 
   void _toggleChip(List<String> list, String id) {
     setState(() {
@@ -226,6 +243,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
                 _GradientBtn(
                   label: _step < 3 ? 'Continuar' : 'Criar conta 🎉',
                   onTap: _next,
+                  loading: _loading,
                 ),
                 if (_step == 2) ...[
                   const SizedBox(height: 10),
@@ -652,8 +670,9 @@ class _ChipGroup extends StatelessWidget {
 class _GradientBtn extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
+  final bool loading;
 
-  const _GradientBtn({required this.label, required this.onTap});
+  const _GradientBtn({required this.label, required this.onTap, this.loading = false});
 
   @override
   Widget build(BuildContext context) {
@@ -671,16 +690,21 @@ class _GradientBtn extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
+          onTap: loading ? null : onTap,
           child: Center(
-            child: Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
+            child: loading
+                ? const SizedBox(
+                    width: 22, height: 22,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                  )
+                : Text(
+                    label,
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
           ),
         ),
       ),

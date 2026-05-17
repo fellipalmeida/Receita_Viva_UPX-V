@@ -4,6 +4,7 @@ import '../modelos/receita.dart';
 import '../servicos/servico_armazenamento.dart';
 import '../tema/tema_app.dart';
 import 'tela_receita.dart';
+import 'tela_lista_compras.dart';
 import '../widgets/food_image.dart';
 import '../main.dart';
 
@@ -84,18 +85,76 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : _favorites.isEmpty
-              ? _buildEmpty()
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  color: AppColors.primary,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                    itemCount: _favorites.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (_, i) => _buildCard(_favorites[i]),
-                  ),
+          : RefreshIndicator(
+              onRefresh: _load,
+              color: AppColors.primary,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                children: [
+                  _buildListaComprasCard(),
+                  const SizedBox(height: 16),
+                  if (_favorites.isNotEmpty) ...[
+                    Text('RECEITAS SALVAS',
+                        style: GoogleFonts.poppins(
+                          fontSize: 11, fontWeight: FontWeight.w700,
+                          color: context.mutedColor, letterSpacing: 1.2,
+                        )),
+                    const SizedBox(height: 10),
+                    ..._favorites.asMap().entries.map((e) {
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: e.key < _favorites.length - 1 ? 12 : 0),
+                        child: _buildCard(_favorites[e.key]),
+                      );
+                    }),
+                  ] else
+                    _buildEmpty(),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _buildListaComprasCard() {
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaListaCompras())),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        decoration: BoxDecoration(
+          color: context.cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: context.borderColor),
+          boxShadow: const [BoxShadow(color: Color(0x1AD4623A), blurRadius: 8, offset: Offset(0, 2))],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.primary.withAlpha(34), AppColors.accent.withAlpha(34)],
                 ),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              alignment: Alignment.center,
+              child: const Text('🛒', style: TextStyle(fontSize: 22)),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Lista de compras',
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14, color: context.textColor)),
+                  const SizedBox(height: 1),
+                  Text('Ingredientes das suas receitas salvas',
+                      style: GoogleFonts.poppins(fontSize: 11, color: context.mutedColor)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: context.mutedColor, size: 20),
+          ],
+        ),
+      ),
     );
   }
 

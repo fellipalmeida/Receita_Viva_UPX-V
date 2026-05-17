@@ -1,7 +1,10 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../tema/tema_app.dart';
 import '../servicos/servico_armazenamento.dart';
+import '../servicos/servico_auth.dart';
+import '../widgets/rv_logo.dart';
 import '../main.dart';
 import 'tela_cadastro.dart';
 import 'tela_onboarding.dart';
@@ -18,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordCtrl = TextEditingController();
   final _storage = StorageService();
   bool _showPassword = false;
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -41,21 +45,10 @@ class _LoginScreenState extends State<LoginScreen> {
       _snack('Preencha e-mail e senha');
       return;
     }
-    final profile = await _storage.getProfile();
-    final savedPassword = await _storage.getPassword();
-    if (profile == null || savedPassword == null) {
-      _snack('Conta não encontrada. Crie uma conta primeiro.');
-      return;
-    }
-    if (profile.email != email) {
-      _snack('E-mail não encontrado');
-      return;
-    }
-    if (savedPassword != password) {
-      _snack('Senha incorreta');
-      return;
-    }
-    if (mounted) {
+    setState(() => _loading = true);
+    try {
+      await AuthService().entrar(email, password);
+      if (!mounted) return;
       final done = await _storage.isOnboardingDone();
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -64,24 +57,22 @@ class _LoginScreenState extends State<LoginScreen> {
           builder: (_) => done ? const MainApp() : const OnboardingScreen(),
         ),
       );
+    } on FirebaseAuthException catch (e) {
+      if (mounted) _snack(_authError(e.code));
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _enterSocial() async {
-    final profile = await _storage.getProfile();
-    if (profile != null && mounted) {
-      final done = await _storage.isOnboardingDone();
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => done ? const MainApp() : const OnboardingScreen(),
-        ),
-      );
-      return;
-    }
-    _snack('Crie uma conta primeiro para usar login social');
-  }
+  String _authError(String code) => switch (code) {
+    'user-not-found' => 'E-mail não encontrado',
+    'wrong-password' => 'Senha incorreta',
+    'invalid-email' => 'E-mail inválido',
+    'invalid-credential' => 'E-mail ou senha inválidos',
+    'user-disabled' => 'Conta desativada',
+    'network-request-failed' => 'Sem conexão com a internet',
+    _ => 'Erro ao entrar. Tente novamente.',
+  };
 
   void _goSignup() {
     Navigator.push(
@@ -117,129 +108,78 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
             SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                children: [
-                  const SizedBox(height: 60),
-                                    Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 52, height: 52,
-                        decoration: BoxDecoration(
-                          gradient: AppColors.primaryGradient,
-                          borderRadius: BorderRadius.circular(52 * 0.28),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x55D4623A),
-                              blurRadius: 12,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(Icons.local_fire_department, color: Colors.white, size: 28),
-                      ),
-                      const SizedBox(width: 10),
-                      RichText(
-                        text: TextSpan(children: [
-                          TextSpan(
-                            text: 'Receita',
-                            style: GoogleFonts.poppins(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.text,
-                            ),
-                          ),
-                          TextSpan(
-                            text: ' Viva',
-                            style: GoogleFonts.poppins(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w400,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ]),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Bem-vindo de volta! 👋',
-                    style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textMuted),
-                  ),
-                  const SizedBox(height: 40),
-                                    _InputField(
-                    controller: _emailCtrl,
-                    placeholder: 'E-mail',
-                    icon: Icons.email_outlined,
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 14),
-                  _InputField(
-                    controller: _passwordCtrl,
-                    placeholder: 'Senha',
-                    icon: Icons.lock_outline,
-                    obscure: !_showPassword,
-                    suffix: IconButton(
-                      icon: Icon(
-                        _showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                        size: 20,
-                        color: AppColors.textMuted,
-                      ),
-                      onPressed: () => setState(() => _showPassword = !_showPassword),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () {},
-                      child: Text(
-                        'Esqueceu a senha?',
-                        style: GoogleFonts.poppins(fontSize: 12, color: AppColors.primary),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _GradientButton(label: 'Entrar', onTap: _enter),
-                  const SizedBox(height: 20),
-                                    Row(children: [
-                    const Expanded(child: Divider(color: AppColors.border, thickness: 1)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(
-                        'ou continue com',
-                        style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textMuted),
-                      ),
-                    ),
-                    const Expanded(child: Divider(color: AppColors.border, thickness: 1)),
-                  ]),
-                  const SizedBox(height: 16),
-                  Row(children: [
-                    Expanded(child: _SocialButton(label: 'Google', icon: 'G', onTap: _enterSocial)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _SocialButton(label: 'Apple', icon: '🍎', onTap: _enterSocial)),
-                  ]),
-                  const SizedBox(height: 32),
-                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.of(context).size.height
+                      - MediaQuery.of(context).padding.top
+                      - MediaQuery.of(context).padding.bottom
+                      - 64,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Center(child: RVLogo(size: 'lg')),
+                    const SizedBox(height: 8),
                     Text(
-                      'Não tem conta? ',
+                      'Descubra receitas feitas para você',
                       style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textMuted),
                     ),
-                    GestureDetector(
-                      onTap: _goSignup,
-                      child: Text(
-                        'Criar conta',
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
+                    const SizedBox(height: 40),
+                    _InputField(
+                      controller: _emailCtrl,
+                      placeholder: 'E-mail',
+                      icon: Icons.email_outlined,
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    const SizedBox(height: 14),
+                    _InputField(
+                      controller: _passwordCtrl,
+                      placeholder: 'Senha',
+                      icon: Icons.lock_outline,
+                      obscure: !_showPassword,
+                      suffix: IconButton(
+                        icon: Icon(
+                          _showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          size: 20,
+                          color: AppColors.textMuted,
+                        ),
+                        onPressed: () => setState(() => _showPassword = !_showPassword),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {},
+                        child: Text(
+                          'Esqueceu a senha?',
+                          style: GoogleFonts.poppins(fontSize: 12, color: AppColors.primary),
                         ),
                       ),
                     ),
-                  ]),
-                  const SizedBox(height: 20),
-                ],
+                    const SizedBox(height: 16),
+                    _GradientButton(label: 'Entrar', onTap: _enter, loading: _loading),
+                    const SizedBox(height: 32),
+                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Text(
+                        'Não tem conta? ',
+                        style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textMuted),
+                      ),
+                      GestureDetector(
+                        onTap: _goSignup,
+                        child: Text(
+                          'Criar conta',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ]),
+                  ],
+                ),
               ),
             ),
           ],
@@ -285,8 +225,9 @@ class _InputField extends StatelessWidget {
 class _GradientButton extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
+  final bool loading;
 
-  const _GradientButton({required this.label, required this.onTap});
+  const _GradientButton({required this.label, required this.onTap, this.loading = false});
 
   @override
   Widget build(BuildContext context) {
@@ -304,16 +245,21 @@ class _GradientButton extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
+          onTap: loading ? null : onTap,
           child: Center(
-            child: Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
+            child: loading
+                ? const SizedBox(
+                    width: 22, height: 22,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                  )
+                : Text(
+                    label,
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
           ),
         ),
       ),
@@ -321,33 +267,3 @@ class _GradientButton extends StatelessWidget {
   }
 }
 
-class _SocialButton extends StatelessWidget {
-  final String label;
-  final String icon;
-  final VoidCallback onTap;
-
-  const _SocialButton({required this.label, required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 46,
-        decoration: BoxDecoration(
-          color: AppColors.cardBg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border, width: 1.5),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(icon, style: GoogleFonts.poppins(fontSize: 16)),
-            const SizedBox(width: 8),
-            Text(label, style: GoogleFonts.poppins(fontSize: 13, color: AppColors.text)),
-          ],
-        ),
-      ),
-    );
-  }
-}
