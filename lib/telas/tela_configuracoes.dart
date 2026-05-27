@@ -4,8 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../tema/tema_app.dart';
 import '../main.dart';
+import '../servicos/servico_auth.dart';
 import 'tela_preferencias.dart';
 import 'tela_lista_compras.dart';
+import 'tela_login.dart';
 
 class TelaConfiguracoes extends StatefulWidget {
   const TelaConfiguracoes({super.key});
@@ -206,6 +208,134 @@ class _TelaConfiguracoesState extends State<TelaConfiguracoes> {
     confirmarCtrl.dispose();
   }
 
+  Future<void> _excluirConta() async {
+    // Pede confirmação com reautenticação por senha
+    final senhaCtrl = TextEditingController();
+    bool verSenha = false;
+    bool carregando = false;
+
+    final confirmado = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+            decoration: BoxDecoration(
+              color: context.cardColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36, height: 4,
+                    decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  '⚠️ Excluir conta',
+                  style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700, color: const Color(0xFFEF4444)),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Esta ação é permanente e não pode ser desfeita. Todos os seus dados serão removidos.',
+                  style: GoogleFonts.poppins(fontSize: 13, color: context.mutedColor, height: 1.5),
+                ),
+                const SizedBox(height: 20),
+                _SenhaField(
+                  label: 'Confirme sua senha',
+                  controller: senhaCtrl,
+                  mostrar: verSenha,
+                  onToggle: () => setSheet(() => verSenha = !verSenha),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEF4444),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      elevation: 0,
+                    ),
+                    onPressed: carregando
+                        ? null
+                        : () async {
+                            if (senhaCtrl.text.isEmpty) return;
+                            setSheet(() => carregando = true);
+                            try {
+                              final user = FirebaseAuth.instance.currentUser;
+                              if (user == null || user.email == null) {
+                                Navigator.pop(ctx, false);
+                                return;
+                              }
+                              // Reautentica antes de deletar
+                              final cred = EmailAuthProvider.credential(
+                                email: user.email!,
+                                password: senhaCtrl.text,
+                              );
+                              await user.reauthenticateWithCredential(cred);
+                              Navigator.pop(ctx, true);
+                            } on FirebaseAuthException catch (e) {
+                              setSheet(() => carregando = false);
+                              final msg = (e.code == 'wrong-password' || e.code == 'invalid-credential')
+                                  ? 'Senha incorreta'
+                                  : 'Erro ao verificar senha';
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                  content: Text(msg, style: GoogleFonts.poppins(fontSize: 13)),
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ));
+                              }
+                            }
+                          },
+                    child: carregando
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : Text('Excluir minha conta', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    senhaCtrl.dispose();
+    if (confirmado != true || !mounted) return;
+
+    try {
+      // Deleta a conta no Firebase
+      await AuthService().excluirConta();
+
+      // Limpa dados locais
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (_) => false,
+        );
+      }
+    } on FirebaseAuthException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Erro ao excluir conta. Tente novamente.', style: GoogleFonts.poppins(fontSize: 13)),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -383,9 +513,10 @@ class _TelaConfiguracoesState extends State<TelaConfiguracoes> {
                         _Linha(
                           icone: '⚠️',
                           label: 'Excluir conta',
+                          sub: 'Remove permanentemente seus dados',
                           perigo: true,
                           borda: false,
-                          onTap: () {},
+                          onTap: _excluirConta,
                         ),
                       ],
                     ),

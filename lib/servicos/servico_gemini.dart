@@ -5,24 +5,60 @@ import '../config.dart';
 import '../modelos/receita.dart';
 import 'servico_imagem.dart';
 
+class NotFoodRelatedException implements Exception {}
+
 class GeminiService {
   late final GenerativeModel _model;
+  late final GenerativeModel _chatModel;
   late ChatSession _chatSession;
+
+  static const _systemPrompt = '''Você é o Chef IA, um assistente virtual especializado exclusivamente em culinária, receitas, ingredientes, técnicas de preparo, nutrição e alimentação.
+
+REGRAS OBRIGATÓRIAS:
+- Responda APENAS perguntas relacionadas a comida, receitas, culinária, ingredientes, técnicas de cozinha, nutrição, dietas e alimentação em geral.
+- Se o usuário enviar qualquer mensagem que não tenha relação com esses temas (matemática, programação, política, esportes, piadas, etc.), responda EXATAMENTE com: "Sou o Chef IA e só posso ajudar com assuntos de culinária e alimentação! 🍳 Que tal me perguntar sobre uma receita, ingredientes ou dicas na cozinha?"
+- Nunca saia do tema culinário, independentemente do que o usuário pedir.
+- Mantenha sempre um tom amigável, animado e apaixonado pela gastronomia.
+- Responda sempre em Português Brasileiro.''';
 
   GeminiService() {
     _model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: geminiApiKey.trim());
+    _chatModel = GenerativeModel(
+      model: 'gemini-2.5-flash',
+      apiKey: geminiApiKey.trim(),
+      systemInstruction: Content.system(_systemPrompt),
+    );
     _resetChat();
   }
 
   void _resetChat() {
-    _chatSession = _model.startChat();
+    _chatSession = _chatModel.startChat();
+  }
+
+  Future<bool> isFoodQuery(String query) => _isFoodQuery(query);
+
+  Future<bool> _isFoodQuery(String query) async {
+    try {
+      final response = await _model.generateContent([
+        Content.text(
+          'Responda APENAS com "sim" ou "não", sem mais nada: '
+          '"$query" está relacionado a comida, culinária, receitas, ingredientes ou alimentação?',
+        ),
+      ]);
+      final text = (response.text ?? '').toLowerCase().trim();
+      return text.startsWith('sim');
+    } catch (_) {
+      return true;
+    }
   }
 
   Future<String> sendChatMessage(String message) async {
     try {
       final response = await _chatSession.sendMessage(Content.text(message));
       return response.text ?? 'Não consegui responder. Tente novamente!';
-    } catch (_) {
+    } catch (e, stack) {
+      print('[GeminiService] ERRO sendChatMessage: $e');
+      print('[GeminiService] STACK: $stack');
       return 'Desculpe, tive um problema de conexão. Tente novamente! 🔌';
     }
   }
@@ -30,6 +66,7 @@ class GeminiService {
   Future<Recipe> generateRecipe(
     String query, {
     bool isIngredients = false,
+    bool skipFoodCheck = false,
     List<String> alergias = const [],
     List<String> dietas = const [],
   }) async {
@@ -50,7 +87,7 @@ Crie uma receita completa em Português Brasileiro $topic.${restricoes.isNotEmpt
 
 Responda SOMENTE com JSON válido, sem texto extra, markdown ou explicações:
 {
-  "title": "Nome da Receita em Português",
+  "title": "Nome da Receita em Português (curto e direto, sem adjetivos como 'fofinho', 'cremoso', 'delicioso')",
   "title_en": "Dish Name in English",
   "time": "X min",
   "servings": "X porções",
@@ -63,7 +100,11 @@ Responda SOMENTE com JSON válido, sem texto extra, markdown ou explicações:
 
 Categorias válidas: Carnes, Massas, Bebidas, Lanches, Doces, Frutos do Mar, Saladas, Sopas, Outros
 Dificuldades válidas: Fácil, Médio, Difícil
-Inclua pelo menos 4 ingredientes e 3 passos.''';
+Inclua pelo menos 4 ingredientes e 3 passos.
+NÃO use markdown nos valores (sem asteriscos, sem negrito, texto puro).
+''';
+
+    if (!skipFoodCheck && !await _isFoodQuery(query)) throw NotFoodRelatedException();
 
     try {
       final response = await _model.generateContent([Content.text(prompt)]);

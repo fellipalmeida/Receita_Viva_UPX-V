@@ -206,27 +206,62 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _startDots();
     _scrollBottom();
 
-    try {
-      final recipe = await _gemini.generateRecipe(msg, alergias: _alergias, dietas: _dietas);
-      await _storage.addToHistory(recipe);
-      await _storage.addNotification(
-        icon: '🤖',
-        text: 'Chef IA criou "${recipe.title}" para você!',
-      );
+    // 1. Verificar se é tema culinário (chamada rápida — só retorna sim/não)
+    final isFood = await _gemini.isFoodQuery(msg);
+
+    if (!isFood) {
+      // Não é culinária — recusa sem gerar receita
       if (mounted) {
         _stopDots();
         setState(() {
           _showTyping = false;
-          _messages.add(_Msg.recipe(recipe: recipe));
+          _messages.add(_Msg.ai(
+            text: 'Sou o Chef IA e só posso ajudar com receitas e culinária! 🍳 Me pergunte sobre algum prato, ingrediente ou técnica de cozinha.',
+          ));
         });
         _scrollBottom();
       }
+      return;
+    }
+
+    // 2. É culinária — gerar card de receita (sem re-verificar o tema)
+    try {
+      final recipe = await _gemini.generateRecipe(
+        msg,
+        skipFoodCheck: true,
+        alergias: _alergias,
+        dietas: _dietas,
+      );
+      if (mounted) {
+        _stopDots();
+        if (recipe.ingredients.isNotEmpty) {
+          await _storage.addToHistory(recipe);
+          await _storage.addNotification(
+            icon: '🤖',
+            text: 'Chef IA criou "${recipe.title}" para você!',
+          );
+          setState(() {
+            _showTyping = false;
+            _messages.add(_Msg.recipe(recipe: recipe));
+          });
+        } else {
+          // Receita veio vazia — responde em texto
+          final reply = await _gemini.sendChatMessage(msg);
+          setState(() {
+            _showTyping = false;
+            _messages.add(_Msg.ai(text: reply));
+          });
+        }
+        _scrollBottom();
+      }
     } catch (_) {
+      // Falhou — fallback conversacional
+      final reply = await _gemini.sendChatMessage(msg);
       if (mounted) {
         _stopDots();
         setState(() {
           _showTyping = false;
-          _messages.add(_Msg.ai(text: '⚠️ Não consegui gerar a receita. Verifique sua conexão e tente novamente.'));
+          _messages.add(_Msg.ai(text: reply));
         });
         _scrollBottom();
       }
@@ -414,6 +449,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                         controller: _inputCtrl,
                         style: GoogleFonts.poppins(fontSize: 13, color: context.textColor),
                         maxLines: null,
+                        keyboardType: TextInputType.multiline,
+                        textInputAction: TextInputAction.newline,
                         decoration: InputDecoration(
                           hintText: 'Mensagem para o Chef IA...',
                           hintStyle: GoogleFonts.poppins(
@@ -429,7 +466,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                           suffixIconConstraints: const BoxConstraints(minHeight: 32, minWidth: 32),
                         ),
                         onChanged: (v) => setState(() => _hasInput = v.trim().isNotEmpty),
-                        onSubmitted: (_) => _send(),
                       ),
                     ),
                   ),

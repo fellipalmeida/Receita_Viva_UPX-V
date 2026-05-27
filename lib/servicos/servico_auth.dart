@@ -26,4 +26,8 @@ class AuthService {
   }
 
   Future<void> sair() async => _auth.signOut();
+
+  Future<void> excluirConta() async {
+    await _auth.currentUser?.delete();
+  }
 }

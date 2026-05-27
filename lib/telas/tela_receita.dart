@@ -346,6 +346,21 @@ class _IngredientCard extends StatelessWidget {
   }
 }
 
+TextSpan _buildStepSpan(String text, BuildContext context) {
+  final base = GoogleFonts.poppins(fontSize: 13, color: context.textColor, height: 1.6);
+  final bold = base.copyWith(fontWeight: FontWeight.w700);
+  final spans = <TextSpan>[];
+  final regex = RegExp(r'\*\*(.*?)\*\*');
+  int last = 0;
+  for (final m in regex.allMatches(text)) {
+    if (m.start > last) spans.add(TextSpan(text: text.substring(last, m.start), style: base));
+    spans.add(TextSpan(text: m.group(1), style: bold));
+    last = m.end;
+  }
+  if (last < text.length) spans.add(TextSpan(text: text.substring(last), style: base));
+  return TextSpan(children: spans.isEmpty ? [TextSpan(text: text, style: base)] : spans);
+}
+
 class _StepCard extends StatelessWidget {
   final int index;
   final String text;
@@ -382,11 +397,7 @@ class _StepCard extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              text,
-              style: GoogleFonts.poppins(
-                fontSize: 13, color: context.textColor, height: 1.6),
-            ),
+            child: Text.rich(_buildStepSpan(text, context)),
           ),
         ],
       ),

@@ -105,6 +105,21 @@ class _SearchScreenState extends State<SearchScreen> {
           _aiLoading = false;
         });
       }
+    } on NotFoodRelatedException {
+      if (mounted) {
+        setState(() => _aiLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Sou o Chef IA! Só consigo criar receitas sobre comida e culinária 🍳',
+              style: GoogleFonts.poppins(fontSize: 13),
+            ),
+            backgroundColor: AppColors.primary,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
     } catch (_) {
       if (mounted) setState(() => _aiLoading = false);
     }

@@ -28,10 +28,16 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadProfile();
+    tabNotifier.addListener(_onTabChange);
+  }
+
+  void _onTabChange() {
+    if (tabNotifier.value == 0) _loadProfile();
   }
 
   @override
   void dispose() {
+    tabNotifier.removeListener(_onTabChange);
     _searchCtrl.dispose();
     super.dispose();
   }

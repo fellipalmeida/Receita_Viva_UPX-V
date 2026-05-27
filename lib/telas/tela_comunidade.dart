@@ -1,14 +1,11 @@
-import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../tema/tema_app.dart';
 import '../modelos/receita.dart';
 import '../servicos/servico_armazenamento.dart';
 import '../servicos/servico_comunidade_firebase.dart';
-import '../dados/dados_mock.dart';
 import 'tela_receita.dart';
 import 'tela_publicar.dart';
-import '../servicos/servico_imagem.dart';
 
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
@@ -22,6 +19,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
   Set<String> _likedPosts = {};
   final Set<String> _savedPosts = {};
   List<Recipe> _userPosts = [];
+  final Map<String, int> _likesCount = {}; // contagem local otimista
   bool _loading = true;
   String _filter = 'recentes';
 
@@ -38,26 +36,45 @@ class _CommunityScreenState extends State<CommunityScreen> {
   }
 
   Future<void> _load() async {
-    final liked = await _storage.getLikedPosts();
-    final firestorePosts = await ComunidadeService().getPosts();
-    if (mounted) {
-      setState(() {
-        _likedPosts = liked;
-        _userPosts = firestorePosts;
-        _loading = false;
-      });
+    try {
+      final liked = await _storage.getLikedPosts();
+      await ComunidadeService().limparSeedsObsoletos();
+      await ComunidadeService().seedSeNecessario();
+      final firestorePosts = await ComunidadeService().getPosts();
+      if (mounted) {
+        setState(() {
+          _likedPosts = liked;
+          _userPosts = firestorePosts;
+          // inicializa contagem local com valores do Firestore
+          for (final p in firestorePosts) {
+            _likesCount[p.id] = p.likes;
+          }
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      print('[Comunidade] erro ao carregar: $e');
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _toggleLike(String postId) async {
-    await _storage.toggleLikedPost(postId);
+    final jaLikado = _likedPosts.contains(postId);
+
+    // atualização otimista na UI
     setState(() {
-      if (_likedPosts.contains(postId)) {
+      if (jaLikado) {
         _likedPosts.remove(postId);
+        _likesCount[postId] = (_likesCount[postId] ?? 1) - 1;
       } else {
         _likedPosts.add(postId);
+        _likesCount[postId] = (_likesCount[postId] ?? 0) + 1;
       }
     });
+
+    // persiste localmente e sincroniza no Firestore
+    await _storage.toggleLikedPost(postId);
+    await ComunidadeService().toggleLike(postId, curtiu: !jaLikado);
   }
 
   void _toggleSave(String postId) {
@@ -70,10 +87,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
     });
   }
 
-  List<Map<String, dynamic>> get _filteredMockPosts {
-    var posts = List<Map<String, dynamic>>.from(mockCommunityPosts);
+  List<Recipe> get _filteredUserPosts {
+    var posts = List<Recipe>.from(_userPosts);
     if (_filter == 'populares') {
-      posts.sort((a, b) => (b['likes'] as int).compareTo(a['likes'] as int));
+      posts.sort((a, b) => b.rating.compareTo(a.rating));
     }
     return posts;
   }
@@ -81,11 +98,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
   void _openPublish() async {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => const PublishScreen()));
     _load();
-  }
-
-  Color _hexToColor(String hex) {
-    final h = hex.replaceAll('#', '');
-    return Color(int.parse('FF$h', radix: 16));
   }
 
   @override
@@ -180,29 +192,39 @@ class _CommunityScreenState extends State<CommunityScreen> {
   }
 
   Widget _buildFeed() {
-    final mockPosts = _filteredMockPosts;
+    final posts = _filteredUserPosts;
 
-    // Combine mock + user posts (user posts come after mocks)
+    if (posts.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('🍽', style: TextStyle(fontSize: 56)),
+            const SizedBox(height: 12),
+            Text(
+              'Nenhuma receita publicada ainda',
+              style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: context.textColor),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Seja o primeiro a compartilhar uma receita!',
+              style: GoogleFonts.poppins(fontSize: 12, color: context.mutedColor),
+            ),
+          ],
+        ),
+      );
+    }
+
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
-      itemCount: mockPosts.length + _userPosts.length,
+      itemCount: posts.length,
       itemBuilder: (_, i) {
-        if (i < mockPosts.length) {
-          final post = mockPosts[i];
-          return _MockPostCard(
-            post: post,
-            liked: _likedPosts.contains(post['id'] as String),
-            saved: _savedPosts.contains(post['id'] as String),
-            onLike: () => _toggleLike(post['id'] as String),
-            onSave: () => _toggleSave(post['id'] as String),
-            hexToColor: _hexToColor,
-          );
-        }
-        final recipe = _userPosts[i - mockPosts.length];
+        final recipe = posts[i];
         return _RecipePostCard(
           recipe: recipe,
           liked: _likedPosts.contains(recipe.id),
           saved: _savedPosts.contains(recipe.id),
+          likesCount: _likesCount[recipe.id] ?? recipe.likes,
           onLike: () => _toggleLike(recipe.id),
           onSave: () => _toggleSave(recipe.id),
           onVerReceita: () => Navigator.push(
@@ -239,110 +261,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
   }
 }
 
-// ── Card para posts do mock ─────────────────────────────────────
-
-class _MockPostCard extends StatefulWidget {
-  final Map<String, dynamic> post;
-  final bool liked;
-  final bool saved;
-  final VoidCallback onLike;
-  final VoidCallback onSave;
-  final Color Function(String) hexToColor;
-
-  const _MockPostCard({
-    required this.post,
-    required this.liked,
-    required this.saved,
-    required this.onLike,
-    required this.onSave,
-    required this.hexToColor,
-  });
-
-  @override
-  State<_MockPostCard> createState() => _MockPostCardState();
-}
-
-class _MockPostCardState extends State<_MockPostCard> {
-  String? _fetchedUrl;
-
-  @override
-  void initState() {
-    super.initState();
-    final imageSearchEn = widget.post['imageSearchEn'] as String?;
-    if (imageSearchEn != null) _loadImage(imageSearchEn);
-  }
-
-  Future<void> _loadImage(String query) async {
-    final url = await FoodImageService().fetchImage(widget.post['id'] as String, query);
-    if (mounted) setState(() => _fetchedUrl = url);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final post = widget.post;
-    return _PostCard(
-      id: post['id'] as String,
-      user: post['user'] as String,
-      posted: '${post['time']} atrás',
-      emoji: post['emoji'] as String,
-      title: post['title'] as String,
-      desc: post['desc'] as String? ?? '',
-      timeReceita: post['timeReceita'] as String? ?? '',
-      diff: post['diff'] as String? ?? '',
-      servings: post['servings'] as String? ?? '',
-      rating: (post['rating'] as num?)?.toDouble() ?? 0,
-      likes: (post['likes'] as int) + (widget.liked ? 1 : 0),
-      liked: widget.liked,
-      saved: widget.saved,
-      onLike: widget.onLike,
-      onSave: widget.onSave,
-      onVerReceita: null,
-      imageWidget: _buildImage(post),
-    );
-  }
-
-  Widget _buildImage(Map<String, dynamic> post) {
-    if (_fetchedUrl != null) {
-      final displayUrl = kIsWeb
-          ? 'https://corsproxy.io/?${Uri.encodeComponent(_fetchedUrl!)}'
-          : _fetchedUrl!;
-      return Image.network(
-        displayUrl,
-        width: double.infinity,
-        height: 180,
-        fit: BoxFit.cover,
-        errorBuilder: (_, error, __) {
-          if (kDebugMode) print('[Comunidade] erro: $error');
-          return _fallback(post);
-        },
-      );
-    }
-    return _fallback(post);
-  }
-
-  Widget _fallback(Map<String, dynamic> post) {
-    return Container(
-      width: double.infinity,
-      height: 180,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [widget.hexToColor(post['colorStart'] as String), widget.hexToColor(post['colorEnd'] as String)],
-        ),
-      ),
-      alignment: Alignment.center,
-      child: Text(post['emoji'] as String, style: const TextStyle(fontSize: 90)),
-    );
-  }
-}
-
 // ── Card para receitas do usuário (Firestore) ──────────────────
 
 class _RecipePostCard extends StatelessWidget {
   final Recipe recipe;
   final bool liked;
   final bool saved;
+  final int likesCount;
   final VoidCallback onLike;
   final VoidCallback onSave;
   final VoidCallback onVerReceita;
@@ -351,6 +276,7 @@ class _RecipePostCard extends StatelessWidget {
     required this.recipe,
     required this.liked,
     required this.saved,
+    required this.likesCount,
     required this.onLike,
     required this.onSave,
     required this.onVerReceita,
@@ -374,7 +300,7 @@ class _RecipePostCard extends StatelessWidget {
       diff: recipe.difficulty,
       servings: recipe.servings,
       rating: recipe.rating,
-      likes: liked ? 1 : 0,
+      likes: likesCount,
       liked: liked,
       saved: saved,
       onLike: onLike,
@@ -474,7 +400,7 @@ class _PostCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(user, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 12, color: context.textColor)),
-                    Text('publicou há $posted', style: GoogleFonts.poppins(fontSize: 10, color: context.mutedColor)),
+                    Text('publicou $posted', style: GoogleFonts.poppins(fontSize: 10, color: context.mutedColor)),
                   ],
                 ),
               ],
