@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/material.dart';
 import '../modelos/receita.dart';
@@ -64,30 +65,47 @@ class _FoodImageState extends State<FoodImage> {
     Widget inner;
 
     if (_url != null) {
-      inner = Image.network(
-        _proxied(_url!),
-        width: widget.width,
-        height: widget.height,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stack) {
-          if (kDebugMode) print('[FoodImage] erro: $error | url: $_url');
-          return _emoji(r);
-        },
-        loadingBuilder: (_, child, progress) {
-          if (progress == null) return child;
-          return Container(
+      // base64 salvo direto no Firestore
+      if (_url!.startsWith('data:')) {
+        try {
+          final base64Str = _url!.split(',').last;
+          final bytes = base64Decode(base64Str);
+          inner = Image.memory(
+            bytes,
             width: widget.width,
             height: widget.height,
-            color: _hex(r.colorStart).withValues(alpha: 0.3),
-            alignment: Alignment.center,
-            child: const SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _emoji(r),
           );
-        },
-      );
+        } catch (_) {
+          inner = _emoji(r);
+        }
+      } else {
+        inner = Image.network(
+          _proxied(_url!),
+          width: widget.width,
+          height: widget.height,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stack) {
+            if (kDebugMode) print('[FoodImage] erro: $error | url: $_url');
+            return _emoji(r);
+          },
+          loadingBuilder: (_, child, progress) {
+            if (progress == null) return child;
+            return Container(
+              width: widget.width,
+              height: widget.height,
+              color: _hex(r.colorStart).withValues(alpha: 0.3),
+              alignment: Alignment.center,
+              child: const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            );
+          },
+        );
+      }
     } else {
       inner = _emoji(r);
     }

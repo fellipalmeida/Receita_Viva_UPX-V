@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../tema/tema_app.dart';
 import '../modelos/receita.dart';
 import '../servicos/servico_armazenamento.dart';
 import '../servicos/servico_comunidade_firebase.dart';
+import '../main.dart';
 import 'tela_receita.dart';
 import 'tela_publicar.dart';
 
@@ -17,9 +19,10 @@ class CommunityScreen extends StatefulWidget {
 class _CommunityScreenState extends State<CommunityScreen> {
   final _storage = StorageService();
   Set<String> _likedPosts = {};
-  final Set<String> _savedPosts = {};
+  Set<String> _curtidasPosts = {};
   List<Recipe> _userPosts = [];
-  final Map<String, int> _likesCount = {}; // contagem local otimista
+  final Map<String, int> _likesCount = {};
+  final Map<String, int> _curtidasCount = {};
   bool _loading = true;
   String _filter = 'recentes';
 
@@ -38,16 +41,18 @@ class _CommunityScreenState extends State<CommunityScreen> {
   Future<void> _load() async {
     try {
       final liked = await _storage.getLikedPosts();
+      final curtidas = await _storage.getCurtidasPosts();
       await ComunidadeService().limparSeedsObsoletos();
       await ComunidadeService().seedSeNecessario();
       final firestorePosts = await ComunidadeService().getPosts();
       if (mounted) {
         setState(() {
           _likedPosts = liked;
+          _curtidasPosts = curtidas;
           _userPosts = firestorePosts;
-          // inicializa contagem local com valores do Firestore
           for (final p in firestorePosts) {
             _likesCount[p.id] = p.likes;
+            _curtidasCount[p.id] = p.curtidas;
           }
           _loading = false;
         });
@@ -58,7 +63,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
   }
 
-  Future<void> _toggleLike(String postId) async {
+  Future<void> _toggleLike(Recipe post) async {
+    final postId = post.id;
     final jaLikado = _likedPosts.contains(postId);
 
     // atualização otimista na UI
@@ -75,16 +81,29 @@ class _CommunityScreenState extends State<CommunityScreen> {
     // persiste localmente e sincroniza no Firestore
     await _storage.toggleLikedPost(postId);
     await ComunidadeService().toggleLike(postId, curtiu: !jaLikado);
+
+    // sincroniza com favoritos: curtiu = salva, descurtiu = remove
+    if (jaLikado) {
+      await _storage.removeFavorite(postId);
+    } else {
+      await _storage.addFavorite(post);
+    }
+    favoritesNotifier.value++;
   }
 
-  void _toggleSave(String postId) {
+  Future<void> _toggleCurtida(String postId) async {
+    final jaCurtiu = _curtidasPosts.contains(postId);
     setState(() {
-      if (_savedPosts.contains(postId)) {
-        _savedPosts.remove(postId);
+      if (jaCurtiu) {
+        _curtidasPosts.remove(postId);
+        _curtidasCount[postId] = (_curtidasCount[postId] ?? 1) - 1;
       } else {
-        _savedPosts.add(postId);
+        _curtidasPosts.add(postId);
+        _curtidasCount[postId] = (_curtidasCount[postId] ?? 0) + 1;
       }
     });
+    await _storage.toggleCurtidaPost(postId);
+    await ComunidadeService().toggleCurtida(postId, curtiu: !jaCurtiu);
   }
 
   List<Recipe> get _filteredUserPosts {
@@ -223,10 +242,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
         return _RecipePostCard(
           recipe: recipe,
           liked: _likedPosts.contains(recipe.id),
-          saved: _savedPosts.contains(recipe.id),
+          curtido: _curtidasPosts.contains(recipe.id),
           likesCount: _likesCount[recipe.id] ?? recipe.likes,
-          onLike: () => _toggleLike(recipe.id),
-          onSave: () => _toggleSave(recipe.id),
+          curtidasCount: _curtidasCount[recipe.id] ?? recipe.curtidas,
+          onLike: () => _toggleLike(recipe),
+          onCurtir: () => _toggleCurtida(recipe.id),
           onVerReceita: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => RecipeScreen(recipe: recipe)),
@@ -266,25 +286,85 @@ class _CommunityScreenState extends State<CommunityScreen> {
 class _RecipePostCard extends StatelessWidget {
   final Recipe recipe;
   final bool liked;
-  final bool saved;
+  final bool curtido;
   final int likesCount;
+  final int curtidasCount;
   final VoidCallback onLike;
-  final VoidCallback onSave;
+  final VoidCallback onCurtir;
   final VoidCallback onVerReceita;
 
   const _RecipePostCard({
     required this.recipe,
     required this.liked,
-    required this.saved,
+    required this.curtido,
     required this.likesCount,
+    required this.curtidasCount,
     required this.onLike,
-    required this.onSave,
+    required this.onCurtir,
     required this.onVerReceita,
   });
 
   Color _hexToColor(String hex) {
     final h = hex.replaceAll('#', '');
     return Color(int.parse('FF$h', radix: 16));
+  }
+
+  Widget _buildImagemCard(Recipe recipe) {
+    final url = recipe.imageUrl;
+    if (url != null) {
+      // base64 salvo direto no Firestore (sem Firebase Storage)
+      if (url.startsWith('data:')) {
+        final base64Str = url.split(',').last;
+        try {
+          final bytes = base64Decode(base64Str);
+          return SizedBox(
+            width: double.infinity,
+            height: 180,
+            child: Image.memory(
+              bytes,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _gradienteEmoji(recipe),
+            ),
+          );
+        } catch (_) {
+          return _gradienteEmoji(recipe);
+        }
+      }
+      // URL normal (ex: http/https)
+      return SizedBox(
+        width: double.infinity,
+        height: 180,
+        child: Image.network(
+          url,
+          fit: BoxFit.cover,
+          loadingBuilder: (_, child, progress) => progress == null
+              ? child
+              : Container(
+                  width: double.infinity, height: 180,
+                  color: _hexToColor(recipe.colorStart).withValues(alpha: 0.3),
+                  alignment: Alignment.center,
+                  child: const SizedBox(width: 24, height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
+                ),
+          errorBuilder: (_, __, ___) => _gradienteEmoji(recipe),
+        ),
+      );
+    }
+    return _gradienteEmoji(recipe);
+  }
+
+  Widget _gradienteEmoji(Recipe recipe) {
+    return Container(
+      width: double.infinity, height: 180,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
+          colors: [_hexToColor(recipe.colorStart), _hexToColor(recipe.colorEnd)],
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Text(recipe.emoji, style: const TextStyle(fontSize: 90)),
+    );
   }
 
   @override
@@ -301,24 +381,13 @@ class _RecipePostCard extends StatelessWidget {
       servings: recipe.servings,
       rating: recipe.rating,
       likes: likesCount,
+      curtidas: curtidasCount,
       liked: liked,
-      saved: saved,
+      curtido: curtido,
       onLike: onLike,
-      onSave: onSave,
+      onCurtir: onCurtir,
       onVerReceita: onVerReceita,
-      imageWidget: Container(
-        width: double.infinity,
-        height: 180,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [_hexToColor(recipe.colorStart), _hexToColor(recipe.colorEnd)],
-          ),
-        ),
-        alignment: Alignment.center,
-        child: Text(recipe.emoji, style: const TextStyle(fontSize: 90)),
-      ),
+      imageWidget: _buildImagemCard(recipe),
     );
   }
 }
@@ -337,10 +406,11 @@ class _PostCard extends StatelessWidget {
   final String servings;
   final double rating;
   final int likes;
+  final int curtidas;
   final bool liked;
-  final bool saved;
+  final bool curtido;
   final VoidCallback onLike;
-  final VoidCallback onSave;
+  final VoidCallback onCurtir;
   final VoidCallback? onVerReceita;
   final Widget imageWidget;
 
@@ -356,10 +426,11 @@ class _PostCard extends StatelessWidget {
     required this.servings,
     required this.rating,
     required this.likes,
+    required this.curtidas,
     required this.liked,
-    required this.saved,
+    required this.curtido,
     required this.onLike,
-    required this.onSave,
+    required this.onCurtir,
     required this.onVerReceita,
     required this.imageWidget,
   });
@@ -406,25 +477,8 @@ class _PostCard extends StatelessWidget {
               ],
             ),
           ),
-          // Imagem com badge de rating
-          Stack(
-            children: [
-              imageWidget,
-              if (rating > 0)
-                Positioned(
-                  top: 10, right: 10,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withAlpha(128),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text('⭐ $rating',
-                        style: GoogleFonts.poppins(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
-                  ),
-                ),
-            ],
-          ),
+          // Imagem
+          imageWidget,
           // Info
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
@@ -456,17 +510,17 @@ class _PostCard extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(child: _ActionBtn(
-                      icon: liked ? Icons.favorite : Icons.favorite_border,
-                      label: '$likes',
-                      active: liked,
-                      onTap: onLike,
+                      icon: curtido ? Icons.thumb_up : Icons.thumb_up_outlined,
+                      label: '$curtidas',
+                      active: curtido,
+                      onTap: onCurtir,
                     )),
                     Container(width: 1, height: 18, color: context.borderColor),
                     Expanded(child: _ActionBtn(
-                      icon: saved ? Icons.bookmark : Icons.bookmark_border,
+                      icon: liked ? Icons.favorite : Icons.favorite_border,
                       label: 'Salvar',
-                      active: saved,
-                      onTap: onSave,
+                      active: liked,
+                      onTap: onLike,
                     )),
                     Container(width: 1, height: 18, color: context.borderColor),
                     Expanded(child: _ActionBtn(

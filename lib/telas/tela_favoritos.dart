@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../modelos/receita.dart';
 import '../servicos/servico_armazenamento.dart';
+import '../servicos/servico_comunidade_firebase.dart';
 import '../tema/tema_app.dart';
 import 'tela_receita.dart';
 import 'tela_lista_compras.dart';
@@ -40,6 +41,16 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   Future<void> _remove(Recipe recipe) async {
     await _storage.removeFavorite(recipe.id);
+
+    // se for receita da comunidade, desfaz o like no Firestore e localmente
+    if (recipe.isCommunity) {
+      final liked = await _storage.getLikedPosts();
+      if (liked.contains(recipe.id)) {
+        await _storage.toggleLikedPost(recipe.id);
+        await ComunidadeService().toggleLike(recipe.id, curtiu: false);
+      }
+    }
+
     favoritesNotifier.value++;
     setState(() => _favorites.removeWhere((r) => r.id == recipe.id));
     if (mounted) {

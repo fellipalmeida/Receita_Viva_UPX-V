@@ -9,6 +9,7 @@ class StorageService {
   static const _communityKey = 'community';
   static const _profileKey = 'user_profile';
   static const _likedPostsKey = 'liked_posts';
+  static const _curtidasPostsKey = 'curtidas_posts';
   static const _onboardingKey = 'onboarding_done';
   static const _notifCountKey = 'notif_unread_count';
   static const _passwordKey = 'user_password';
@@ -127,6 +128,23 @@ class StorageService {
       liked.add(postId);
     }
     await prefs.setStringList(_likedPostsKey, liked.toList());
+  }
+
+  // ── Curtidas Posts ─────────────────────────────────────────
+  Future<Set<String>> getCurtidasPosts() async {
+    final prefs = await SharedPreferences.getInstance();
+    return (prefs.getStringList(_curtidasPostsKey) ?? []).toSet();
+  }
+
+  Future<void> toggleCurtidaPost(String postId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final curtidas = (prefs.getStringList(_curtidasPostsKey) ?? []).toSet();
+    if (curtidas.contains(postId)) {
+      curtidas.remove(postId);
+    } else {
+      curtidas.add(postId);
+    }
+    await prefs.setStringList(_curtidasPostsKey, curtidas.toList());
   }
 
   // ── Password ───────────────────────────────────────────────

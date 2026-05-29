@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../modelos/receita.dart';
 
 class ComunidadeService {
@@ -42,6 +44,7 @@ class ComunidadeService {
         'difficulty': 'Fácil',
         'rating': 4.8,
         'likes': 3,
+        'curtidas': 1,
         'isCommunity': true,
         'ingredients': [
           '3 cenouras médias',
@@ -74,6 +77,7 @@ class ComunidadeService {
         'difficulty': 'Médio',
         'rating': 4.6,
         'likes': 2,
+        'curtidas': 0,
         'isCommunity': true,
         'ingredients': [
           '500g de peito de frango em cubos',
@@ -107,6 +111,7 @@ class ComunidadeService {
         'difficulty': 'Fácil',
         'rating': 5.0,
         'likes': 4,
+        'curtidas': 2,
         'isCommunity': true,
         'ingredients': [
           '1 lata de leite condensado',
@@ -136,6 +141,7 @@ class ComunidadeService {
         'difficulty': 'Fácil',
         'rating': 4.7,
         'likes': 2,
+        'curtidas': 1,
         'isCommunity': true,
         'ingredients': [
           '200g de espaguete',
@@ -180,20 +186,42 @@ class ComunidadeService {
       'ingredients': receita.ingredients,
       'steps': receita.steps,
       'likes': 0,
+      'curtidas': 0,
+      'imageUrl': receita.imageUrl,
       'createdAt': FieldValue.serverTimestamp(),
       'isCommunity': true,
     });
   }
 
-  /// Incrementa ou decrementa o contador de likes de um post.
+  /// Faz upload de uma imagem para o Firebase Storage e retorna a URL pública.
+  /// Lança exceção se o upload falhar.
+  Future<String> uploadImagemPost(String postId, File imagem) async {
+    final ref = FirebaseStorage.instance
+        .ref()
+        .child('posts/$postId/capa.jpg');
+    await ref.putFile(
+      imagem,
+      SettableMetadata(contentType: 'image/jpeg'),
+    );
+    return await ref.getDownloadURL();
+  }
+
+  /// Incrementa ou decrementa o contador de likes (coração) de um post.
   Future<void> toggleLike(String postId, {required bool curtiu}) async {
     try {
       await _db.collection(_colecao).doc(postId).update({
         'likes': FieldValue.increment(curtiu ? 1 : -1),
       });
-    } catch (_) {
-      // silencia erro de rede — o estado local já foi atualizado
-    }
+    } catch (_) {}
+  }
+
+  /// Incrementa ou decrementa o contador de curtidas (👍) de um post.
+  Future<void> toggleCurtida(String postId, {required bool curtiu}) async {
+    try {
+      await _db.collection(_colecao).doc(postId).update({
+        'curtidas': FieldValue.increment(curtiu ? 1 : -1),
+      });
+    } catch (_) {}
   }
 
   Future<List<Recipe>> getPosts() async {
@@ -222,6 +250,8 @@ class ComunidadeService {
         isCommunity: true,
         createdAt: (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
         likes: (d['likes'] as num?)?.toInt() ?? 0,
+        curtidas: (d['curtidas'] as num?)?.toInt() ?? 0,
+        imageUrl: d['imageUrl'] as String?,
       );
     }).toList();
   }

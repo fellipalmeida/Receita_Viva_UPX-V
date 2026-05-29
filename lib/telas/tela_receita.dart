@@ -152,8 +152,10 @@ class _RecipeScreenState extends State<RecipeScreen> {
                       _InfoStat(label: '👤 Porções', value: recipe.servings),
                       _divider(context),
                       _InfoStat(label: '📊 Nível', value: recipe.difficulty),
-                      _divider(context),
-                      _InfoStat(label: '⭐ Nota', value: recipe.rating.toString()),
+                      if (!recipe.isCommunity) ...[
+                        _divider(context),
+                        _InfoStat(label: '⭐ Nota', value: recipe.rating.toString()),
+                      ],
                     ],
                   ),
                 ),

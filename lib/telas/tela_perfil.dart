@@ -9,7 +9,6 @@ import 'tela_configuracoes.dart';
 import 'tela_suporte.dart';
 import 'tela_login.dart';
 import 'tela_foto_picker.dart';
-import 'tela_seguidores.dart';
 import '../main.dart';
 import '../servicos/servico_auth.dart';
 
@@ -26,7 +25,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _email = '';
   String _bio = '';
   int? _avatarIndex;
-  int _recipesCount = 0;
   List<Recipe> _publishedRecipes = [];
   bool _loading = true;
   bool _showMenu = false;
@@ -39,7 +37,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _load() async {
     final profile = await _storage.getProfile();
-    final history = await _storage.getHistory();
     final published = await _storage.getCommunityRecipes();
     if (mounted) {
       setState(() {
@@ -47,7 +44,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _email = profile?.email ?? '';
         _bio = profile?.bio ?? '';
         _avatarIndex = profile?.avatarIndex;
-        _recipesCount = history.length;
         _publishedRecipes = published;
         _loading = false;
       });
@@ -117,8 +113,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _buildAvatar(),
           const SizedBox(height: 14),
           _buildNameBio(),
-          const SizedBox(height: 18),
-          _buildStats(),
+          const SizedBox(height: 14),
+          _buildEditarBtn(),
           const SizedBox(height: 18),
           _buildMinhasReceitas(),
           const SizedBox(height: 100),
@@ -255,34 +251,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildStats() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _StatBtn(
-          value: '$_recipesCount',
-          label: 'Receitas',
-          onTap: null,
+  Widget _buildEditarBtn() {
+    return GestureDetector(
+      onTap: _openEditProfile,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.primary),
+          borderRadius: BorderRadius.circular(20),
         ),
-        _Divider(),
-        _StatBtn(
-          value: '${_publishedRecipes.length}',
-          label: 'Seguidores',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const TelaSeguidores(titulo: 'Seguidores')),
-          ),
+        child: Text(
+          'Editar perfil',
+          style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary),
         ),
-        _Divider(),
-        _StatBtn(
-          value: '0',
-          label: 'Seguindo',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const TelaSeguidores(titulo: 'Seguindo', modoSeguindo: true)),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -356,9 +338,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AspectRatio(
-                  aspectRatio: 1.1,
+                Expanded(
                   child: Container(
+                    width: double.infinity,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
@@ -383,7 +365,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '⏱ ${recipe.time} · ⭐ ${recipe.rating}',
+                        '⏱ ${recipe.time} · 🔥 ${recipe.difficulty}',
                         style: GoogleFonts.poppins(fontSize: 10, color: context.mutedColor),
                       ),
                     ],
@@ -421,40 +403,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ],
     );
-  }
-}
-
-class _StatBtn extends StatelessWidget {
-  final String value;
-  final String label;
-  final VoidCallback? onTap;
-
-  const _StatBtn({required this.value, required this.label, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          children: [
-            Text(value,
-                style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700, color: context.textColor, letterSpacing: -0.3)),
-            const SizedBox(height: 1),
-            Text(label,
-                style: GoogleFonts.poppins(fontSize: 11, color: context.mutedColor)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Divider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(width: 1, height: 36, color: context.borderColor);
   }
 }
 
@@ -541,7 +489,6 @@ class _MenuSheet extends StatelessWidget {
               ),
             ),
             // Menu items
-            _MenuItem(icon: Icons.edit_outlined, label: 'Editar perfil', onTap: onEditarPerfil),
             _MenuItem(icon: Icons.settings_outlined, label: 'Configurações', onTap: onConfiguracoes),
             _MenuItem(icon: Icons.chat_bubble_outline, label: 'Suporte', onTap: onSuporte),
             // Logout

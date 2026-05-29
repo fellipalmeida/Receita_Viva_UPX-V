@@ -21,6 +21,7 @@ class Recipe {
   final String? imageUrl;
   final String? titleEn;
   final int likes;
+  final int curtidas;
 
   Recipe({
     required this.id,
@@ -43,6 +44,7 @@ class Recipe {
     this.imageUrl,
     this.titleEn,
     this.likes = 0,
+    this.curtidas = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -66,6 +68,7 @@ class Recipe {
         'imageUrl': imageUrl,
         'titleEn': titleEn,
         'likes': likes,
+        'curtidas': curtidas,
       };
 
   factory Recipe.fromJson(Map<String, dynamic> json) => Recipe(
@@ -89,6 +92,7 @@ class Recipe {
         imageUrl: json['imageUrl'] as String?,
         titleEn: json['titleEn'] as String?,
         likes: (json['likes'] as num?)?.toInt() ?? 0,
+        curtidas: (json['curtidas'] as num?)?.toInt() ?? 0,
       );
 
   String toJsonString() => jsonEncode(toJson());
