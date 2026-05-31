@@ -224,6 +224,26 @@ class ComunidadeService {
     } catch (_) {}
   }
 
+  Future<void> editarPost(Recipe receita) async {
+    await _db.collection(_colecao).doc(receita.id).update({
+      'title': receita.title,
+      'emoji': receita.emoji,
+      'colorStart': receita.colorStart,
+      'colorEnd': receita.colorEnd,
+      'category': receita.category,
+      'time': receita.time,
+      'servings': receita.servings,
+      'difficulty': receita.difficulty,
+      'ingredients': receita.ingredients,
+      'steps': receita.steps,
+      'imageUrl': receita.imageUrl,
+    });
+  }
+
+  Future<void> deletarPost(String postId) async {
+    await _db.collection(_colecao).doc(postId).delete();
+  }
+
   Future<List<Recipe>> getPosts() async {
     final snapshot = await _db
         .collection(_colecao)

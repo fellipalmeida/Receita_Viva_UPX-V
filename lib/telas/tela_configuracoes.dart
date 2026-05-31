@@ -6,7 +6,6 @@ import '../tema/tema_app.dart';
 import '../main.dart';
 import '../servicos/servico_auth.dart';
 import 'tela_preferencias.dart';
-import 'tela_lista_compras.dart';
 import 'tela_login.dart';
 
 class TelaConfiguracoes extends StatefulWidget {
@@ -465,14 +464,6 @@ class _TelaConfiguracoesState extends State<TelaConfiguracoes> {
                           sub: 'Alergias, dietas e cozinhas favoritas',
                           direita: Icon(Icons.chevron_right, color: context.mutedColor, size: 20),
                           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaPreferencias())),
-                        ),
-                        _Linha(
-                          icone: '🛒',
-                          label: 'Lista de compras',
-                          sub: 'Itens das suas receitas salvas',
-                          direita: Icon(Icons.chevron_right, color: context.mutedColor, size: 20),
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaListaCompras())),
-                          borda: false,
                         ),
                       ],
                     ),

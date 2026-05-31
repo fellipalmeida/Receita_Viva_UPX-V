@@ -5,7 +5,6 @@ import '../servicos/servico_armazenamento.dart';
 import '../servicos/servico_comunidade_firebase.dart';
 import '../tema/tema_app.dart';
 import 'tela_receita.dart';
-import 'tela_lista_compras.dart';
 import '../widgets/food_image.dart';
 import '../main.dart';
 
@@ -102,8 +101,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                 children: [
-                  _buildListaComprasCard(),
-                  const SizedBox(height: 16),
                   if (_favorites.isNotEmpty) ...[
                     Text('RECEITAS SALVAS',
                         style: GoogleFonts.poppins(
@@ -122,50 +119,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 ],
               ),
             ),
-    );
-  }
-
-  Widget _buildListaComprasCard() {
-    return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaListaCompras())),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-        decoration: BoxDecoration(
-          color: context.cardColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: context.borderColor),
-          boxShadow: const [BoxShadow(color: Color(0x1AD4623A), blurRadius: 8, offset: Offset(0, 2))],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44, height: 44,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppColors.primary.withAlpha(34), AppColors.accent.withAlpha(34)],
-                ),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              alignment: Alignment.center,
-              child: const Text('🛒', style: TextStyle(fontSize: 22)),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Lista de compras',
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14, color: context.textColor)),
-                  const SizedBox(height: 1),
-                  Text('Ingredientes das suas receitas salvas',
-                      style: GoogleFonts.poppins(fontSize: 11, color: context.mutedColor)),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right, color: context.mutedColor, size: 20),
-          ],
-        ),
-      ),
     );
   }
 

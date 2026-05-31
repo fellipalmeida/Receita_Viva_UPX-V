@@ -25,6 +25,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
   final Map<String, int> _curtidasCount = {};
   bool _loading = true;
   String _filter = 'recentes';
+  String _autorNome = '';
 
   static const _filters = [
     {'id': 'recentes', 'label': 'Recentes'},
@@ -40,6 +41,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
   Future<void> _load() async {
     try {
+      final profile = await _storage.getProfile();
       final liked = await _storage.getLikedPosts();
       final curtidas = await _storage.getCurtidasPosts();
       await ComunidadeService().limparSeedsObsoletos();
@@ -47,6 +49,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       final firestorePosts = await ComunidadeService().getPosts();
       if (mounted) {
         setState(() {
+          _autorNome = profile?.name ?? '';
           _likedPosts = liked;
           _curtidasPosts = curtidas;
           _userPosts = firestorePosts;
@@ -109,7 +112,19 @@ class _CommunityScreenState extends State<CommunityScreen> {
   List<Recipe> get _filteredUserPosts {
     var posts = List<Recipe>.from(_userPosts);
     if (_filter == 'populares') {
-      posts.sort((a, b) => b.rating.compareTo(a.rating));
+      posts.sort((a, b) {
+        final ca = _curtidasCount[a.id] ?? a.curtidas;
+        final cb = _curtidasCount[b.id] ?? b.curtidas;
+        return cb.compareTo(ca);
+      });
+    } else if (_filter == 'rede') {
+      final autoresSalvos = _userPosts
+          .where((p) => _likedPosts.contains(p.id))
+          .map((p) => p.author)
+          .whereType<String>()
+          .toSet();
+      if (autoresSalvos.isEmpty) return [];
+      posts = posts.where((p) => autoresSalvos.contains(p.author)).toList();
     }
     return posts;
   }
@@ -117,6 +132,82 @@ class _CommunityScreenState extends State<CommunityScreen> {
   void _openPublish() async {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => const PublishScreen()));
     _load();
+  }
+
+  void _showOpcoes(Recipe post) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        decoration: BoxDecoration(
+          color: context.cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 20),
+            _OpcaoItem(
+              icon: Icons.edit_outlined,
+              label: 'Editar receita',
+              onTap: () async {
+                Navigator.pop(context);
+                final atualizado = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PublishScreen(recipe: post, isEdit: true),
+                  ),
+                );
+                if (atualizado == true) _load();
+              },
+            ),
+            const SizedBox(height: 8),
+            _OpcaoItem(
+              icon: Icons.delete_outline,
+              label: 'Excluir receita',
+              cor: const Color(0xFFEF4444),
+              onTap: () async {
+                Navigator.pop(context);
+                final confirmado = await showDialog<bool>(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    title: Text('Excluir receita',
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+                    content: Text('Deseja remover "${post.title}" da comunidade?',
+                        style: GoogleFonts.poppins(fontSize: 13)),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: Text('Cancelar',
+                            style: GoogleFonts.poppins(color: context.mutedColor)),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: Text('Excluir',
+                            style: GoogleFonts.poppins(
+                                color: const Color(0xFFEF4444),
+                                fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmado == true) {
+                  await ComunidadeService().deletarPost(post.id);
+                  await _storage.removeFavorite(post.id);
+                  _load();
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -214,6 +305,27 @@ class _CommunityScreenState extends State<CommunityScreen> {
     final posts = _filteredUserPosts;
 
     if (posts.isEmpty) {
+      if (_filter == 'rede') {
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('👥', style: TextStyle(fontSize: 56)),
+              const SizedBox(height: 12),
+              Text(
+                'Sua rede está vazia',
+                style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: context.textColor),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Salve receitas para ver posts de\ncozinheiros que você curte!',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(fontSize: 12, color: context.mutedColor),
+              ),
+            ],
+          ),
+        );
+      }
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -239,6 +351,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       itemCount: posts.length,
       itemBuilder: (_, i) {
         final recipe = posts[i];
+        final isMeuPost = _autorNome.isNotEmpty && recipe.author == _autorNome;
         return _RecipePostCard(
           recipe: recipe,
           liked: _likedPosts.contains(recipe.id),
@@ -251,6 +364,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
             context,
             MaterialPageRoute(builder: (_) => RecipeScreen(recipe: recipe)),
           ),
+          onOpcoes: isMeuPost ? () => _showOpcoes(recipe) : null,
         );
       },
     );
@@ -292,6 +406,7 @@ class _RecipePostCard extends StatelessWidget {
   final VoidCallback onLike;
   final VoidCallback onCurtir;
   final VoidCallback onVerReceita;
+  final VoidCallback? onOpcoes;
 
   const _RecipePostCard({
     required this.recipe,
@@ -302,6 +417,7 @@ class _RecipePostCard extends StatelessWidget {
     required this.onLike,
     required this.onCurtir,
     required this.onVerReceita,
+    this.onOpcoes,
   });
 
   Color _hexToColor(String hex) {
@@ -387,6 +503,7 @@ class _RecipePostCard extends StatelessWidget {
       onLike: onLike,
       onCurtir: onCurtir,
       onVerReceita: onVerReceita,
+      onOpcoes: onOpcoes,
       imageWidget: _buildImagemCard(recipe),
     );
   }
@@ -412,6 +529,7 @@ class _PostCard extends StatelessWidget {
   final VoidCallback onLike;
   final VoidCallback onCurtir;
   final VoidCallback? onVerReceita;
+  final VoidCallback? onOpcoes;
   final Widget imageWidget;
 
   const _PostCard({
@@ -433,6 +551,7 @@ class _PostCard extends StatelessWidget {
     required this.onCurtir,
     required this.onVerReceita,
     required this.imageWidget,
+    this.onOpcoes,
   });
 
   String _initials(String name) {
@@ -474,6 +593,12 @@ class _PostCard extends StatelessWidget {
                     Text('publicou $posted', style: GoogleFonts.poppins(fontSize: 10, color: context.mutedColor)),
                   ],
                 ),
+                const Spacer(),
+                if (onOpcoes != null)
+                  GestureDetector(
+                    onTap: onOpcoes,
+                    child: Icon(Icons.more_vert, size: 20, color: context.mutedColor),
+                  ),
               ],
             ),
           ),
@@ -550,6 +675,42 @@ Widget _metaChip(String label, BuildContext context) {
     child: Text(label,
         style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w500, color: context.textColor)),
   );
+}
+
+class _OpcaoItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color? cor;
+  final VoidCallback onTap;
+
+  const _OpcaoItem({required this.icon, required this.label, required this.onTap, this.cor});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = cor ?? context.textColor;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: cor != null ? const Color(0x11EF4444) : context.chipColor,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: c, size: 20),
+              const SizedBox(width: 14),
+              Text(label,
+                  style: GoogleFonts.poppins(fontSize: 14, color: c, fontWeight: FontWeight.w500)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ActionBtn extends StatelessWidget {

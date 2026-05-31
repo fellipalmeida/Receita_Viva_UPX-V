@@ -11,6 +11,8 @@ import 'tela_login.dart';
 import 'tela_foto_picker.dart';
 import '../main.dart';
 import '../servicos/servico_auth.dart';
+import '../servicos/servico_comunidade_firebase.dart';
+import 'tela_publicar.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -87,6 +89,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Color _hexToColor(String hex) {
     final h = hex.replaceAll('#', '');
     return Color(int.parse('FF$h', radix: 16));
+  }
+
+  void _showOpcoesReceita(Recipe recipe) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        decoration: BoxDecoration(
+          color: context.cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 20),
+            _OpcaoItem(
+              icon: Icons.edit_outlined,
+              label: 'Editar receita',
+              onTap: () async {
+                Navigator.pop(context);
+                final atualizado = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PublishScreen(recipe: recipe, isEdit: true),
+                  ),
+                );
+                if (atualizado == true) _load();
+              },
+            ),
+            const SizedBox(height: 8),
+            _OpcaoItem(
+              icon: Icons.delete_outline,
+              label: 'Excluir receita',
+              cor: const Color(0xFFEF4444),
+              onTap: () async {
+                Navigator.pop(context);
+                final confirmado = await showDialog<bool>(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    title: Text('Excluir receita',
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+                    content: Text('Deseja remover "${recipe.title}" da comunidade?',
+                        style: GoogleFonts.poppins(fontSize: 13)),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: Text('Cancelar',
+                            style: GoogleFonts.poppins(color: context.mutedColor)),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: Text('Excluir',
+                            style: GoogleFonts.poppins(
+                                color: const Color(0xFFEF4444),
+                                fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmado == true && mounted) {
+                  await ComunidadeService().deletarPost(recipe.id);
+                  await _storage.deleteFromCommunity(recipe.id);
+                  await _storage.removeFavorite(recipe.id);
+                  _load();
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -323,57 +402,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
       itemCount: _publishedRecipes.length,
       itemBuilder: (_, i) {
         final recipe = _publishedRecipes[i];
-        return GestureDetector(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => RecipeScreen(recipe: recipe)),
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              color: context.cardColor,
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: const [BoxShadow(color: Color(0x1AD4623A), blurRadius: 8, offset: Offset(0, 2))],
-            ),
-            clipBehavior: Clip.hardEdge,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [_hexToColor(recipe.colorStart), _hexToColor(recipe.colorEnd)],
+        return Stack(
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => RecipeScreen(recipe: recipe)),
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: context.cardColor,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: const [BoxShadow(color: Color(0x1AD4623A), blurRadius: 8, offset: Offset(0, 2))],
+                ),
+                clipBehavior: Clip.hardEdge,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [_hexToColor(recipe.colorStart), _hexToColor(recipe.colorEnd)],
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(recipe.emoji, style: const TextStyle(fontSize: 48)),
                       ),
                     ),
-                    alignment: Alignment.center,
-                    child: Text(recipe.emoji, style: const TextStyle(fontSize: 48)),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        recipe.title,
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 12, color: context.textColor, height: 1.3),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            recipe.title,
+                            style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 12, color: context.textColor, height: 1.3),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '⏱ ${recipe.time} · 🔥 ${recipe.difficulty}',
+                            style: GoogleFonts.poppins(fontSize: 10, color: context.mutedColor),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '⏱ ${recipe.time} · 🔥 ${recipe.difficulty}',
-                        style: GoogleFonts.poppins(fontSize: 10, color: context.mutedColor),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+            Positioned(
+              top: 6, right: 6,
+              child: GestureDetector(
+                onTap: () => _showOpcoesReceita(recipe),
+                child: Container(
+                  width: 28, height: 28,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(100),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.more_vert, size: 16, color: Colors.white),
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -503,6 +600,42 @@ class _MenuSheet extends StatelessWidget {
             ),
             const SizedBox(height: 8),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OpcaoItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color? cor;
+  final VoidCallback onTap;
+
+  const _OpcaoItem({required this.icon, required this.label, required this.onTap, this.cor});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = cor ?? context.textColor;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: cor != null ? const Color(0x11EF4444) : context.chipColor,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: c, size: 20),
+              const SizedBox(width: 14),
+              Text(label,
+                  style: GoogleFonts.poppins(fontSize: 14, color: c, fontWeight: FontWeight.w500)),
+            ],
+          ),
         ),
       ),
     );

@@ -36,8 +36,9 @@ const _emojiPorCategoria = {
 
 class PublishScreen extends StatefulWidget {
   final Recipe? recipe;
+  final bool isEdit;
 
-  const PublishScreen({super.key, this.recipe});
+  const PublishScreen({super.key, this.recipe, this.isEdit = false});
 
   @override
   State<PublishScreen> createState() => _PublishScreenState();
@@ -56,6 +57,7 @@ class _PublishScreenState extends State<PublishScreen> {
   final _categoriaPersonalizadaCtrl = TextEditingController();
 
   File? _imagemSelecionada;
+  String? _imagemUrlOriginal;
   bool _carregandoImagem = false;
 
   final List<TextEditingController> _ingredientCtrls = [];
@@ -78,6 +80,7 @@ class _PublishScreenState extends State<PublishScreen> {
       _servingsCtrl.text = r.servings;
       _categoria = _categorias.contains(r.category) ? r.category : 'Outros';
       _dificuldade = _dificuldades.contains(r.difficulty) ? r.difficulty : 'Médio';
+      _imagemUrlOriginal = r.imageUrl;
       for (final ing in r.ingredients) {
         _ingredientCtrls.add(TextEditingController(text: ing));
       }
@@ -196,7 +199,7 @@ class _PublishScreenState extends State<PublishScreen> {
     );
   }
 
-  // ── Publicar ──────────────────────────────────────────────────
+  // ── Publicar / Salvar edição ──────────────────────────────────
   Future<void> _publish() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -208,29 +211,33 @@ class _PublishScreenState extends State<PublishScreen> {
 
     setState(() { _publishing = true; _publishStatus = ''; });
     try {
-      final postId = DateTime.now().millisecondsSinceEpoch.toString();
+      final postId = widget.isEdit
+          ? widget.recipe!.id
+          : DateTime.now().millisecondsSinceEpoch.toString();
 
-      // Codifica a imagem em base64 e salva direto no Firestore (sem Firebase Storage)
-      String? imageUrl;
+      // Nova imagem selecionada → codifica em base64; senão mantém a original
+      String? imageUrl = _imagemUrlOriginal;
       if (_imagemSelecionada != null) {
         setState(() => _publishStatus = 'Processando imagem...');
         final bytes = await _imagemSelecionada!.readAsBytes();
         imageUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-        setState(() => _publishStatus = 'Publicando receita...');
       }
+      setState(() => _publishStatus = widget.isEdit ? 'Salvando alterações...' : 'Publicando receita...');
 
       final recipe = Recipe(
         id: postId,
         title: _titleCtrl.text.trim(),
         query: _titleCtrl.text.trim(),
-        createdAt: DateTime.now(),
+        createdAt: widget.recipe?.createdAt ?? DateTime.now(),
         isCommunity: true,
-        author: _autorNome.isEmpty ? 'Anônimo' : _autorNome,
+        author: widget.isEdit ? (widget.recipe!.author ?? _autorNome) : (_autorNome.isEmpty ? 'Anônimo' : _autorNome),
         emoji: _emoji,
         time: _timeCtrl.text.trim().isEmpty ? '30 min' : _timeCtrl.text.trim(),
         servings: _servingsCtrl.text.trim().isEmpty ? '4 porções' : _servingsCtrl.text.trim(),
         difficulty: _dificuldade,
         rating: widget.recipe?.rating ?? 4.5,
+        likes: widget.recipe?.likes ?? 0,
+        curtidas: widget.recipe?.curtidas ?? 0,
         colorStart: _cores[0],
         colorEnd: _cores[1],
         category: _categoriaFinal,
@@ -239,16 +246,25 @@ class _PublishScreenState extends State<PublishScreen> {
         imageUrl: imageUrl,
       );
 
-      await ComunidadeService().publicar(recipe);
-      await StorageService().addNotification(
-        icon: '🍳',
-        text: 'Receita "${recipe.title}" publicada na comunidade!',
-      );
-      await StorageService().publishRecipe(recipe);
+      if (widget.isEdit) {
+        await ComunidadeService().editarPost(recipe);
+        await StorageService().deleteFromCommunity(recipe.id);
+        await StorageService().publishRecipe(recipe);
+      } else {
+        await ComunidadeService().publicar(recipe);
+        await StorageService().addNotification(
+          icon: '🍳',
+          text: 'Receita "${recipe.title}" publicada na comunidade!',
+        );
+        await StorageService().publishRecipe(recipe);
+      }
 
       if (mounted) {
-        _snack('🎉 Receita publicada!', cor: Colors.green.shade600);
-        Navigator.pop(context);
+        _snack(
+          widget.isEdit ? '✅ Receita atualizada!' : '🎉 Receita publicada!',
+          cor: Colors.green.shade600,
+        );
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) _snack('Erro: $e', cor: Colors.red.shade700);
@@ -288,7 +304,7 @@ class _PublishScreenState extends State<PublishScreen> {
                   ),
                   Expanded(
                     child: Center(
-                      child: Text('Publicar receita',
+                      child: Text(widget.isEdit ? 'Editar receita' : 'Publicar receita',
                         style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16, color: context.textColor)),
                     ),
                   ),
@@ -305,29 +321,6 @@ class _PublishScreenState extends State<PublishScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Banner IA
-                      if (widget.recipe != null) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Text('✨', style: TextStyle(fontSize: 16)),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text('Receita gerada pela IA carregada. Edite à vontade!',
-                                  style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.primary)),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-
                       // ── Título ────────────────────────────
                       _Label('Título da receita'),
                       const SizedBox(height: 6),
@@ -594,7 +587,7 @@ class _PublishScreenState extends State<PublishScreen> {
                                         ],
                                       ],
                                     )
-                                  : Text('Publicar na Comunidade',
+                                  : Text(widget.isEdit ? 'Salvar alterações' : 'Publicar na Comunidade',
                                       style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
                             ),
                           ),

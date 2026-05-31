@@ -9,6 +9,7 @@ import '../servicos/servico_gemini.dart';
 import '../servicos/servico_armazenamento.dart';
 import '../config.dart';
 import 'tela_receita.dart';
+import 'tela_historico.dart';
 import '../main.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -352,6 +353,20 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                           ],
                         ),
                       ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                    ),
+                    child: Container(
+                      width: 38, height: 38,
+                      decoration: BoxDecoration(
+                        color: context.chipColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.history, size: 20, color: context.mutedColor),
                     ),
                   ),
                 ],
