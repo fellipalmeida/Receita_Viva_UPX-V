@@ -40,11 +40,16 @@ class _SearchScreenState extends State<SearchScreen> {
   void initState() {
     super.initState();
     _loadPreferences();
+    tabNotifier.addListener(_onTabChanged);
     if (widget.initialQuery.isNotEmpty) {
       _query = widget.initialQuery;
       _ctrl.text = widget.initialQuery;
       WidgetsBinding.instance.addPostFrameCallback((_) => _submitSearch());
     }
+  }
+
+  void _onTabChanged() {
+    if (tabNotifier.value == 5) _loadPreferences();
   }
 
   Future<void> _loadPreferences() async {
@@ -59,6 +64,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    tabNotifier.removeListener(_onTabChanged);
     _ctrl.dispose();
     super.dispose();
   }
@@ -96,6 +102,8 @@ class _SearchScreenState extends State<SearchScreen> {
       _aiLoading = true;
       _aiRecipe = null;
     });
+    // Recarrega preferências antes de gerar para garantir que estão atualizadas
+    await _loadPreferences();
     try {
       final recipe = await _gemini.generateRecipe(query, alergias: _alergias, dietas: _dietas);
       await _storage.addToHistory(recipe);

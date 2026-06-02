@@ -35,6 +35,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _load();
+    tabNotifier.addListener(_onTabChange);
+  }
+
+  void _onTabChange() {
+    if (tabNotifier.value == 4) _load();
+  }
+
+  @override
+  void dispose() {
+    tabNotifier.removeListener(_onTabChange);
+    super.dispose();
   }
 
   Future<void> _load() async {

@@ -65,6 +65,11 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     ));
     _loadPreferences();
     _initSpeech();
+    tabNotifier.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    if (tabNotifier.value == 2) _loadPreferences();
   }
 
   Future<void> _initSpeech() async {
@@ -90,6 +95,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    tabNotifier.removeListener(_onTabChanged);
     for (final c in _dotControllers) c.dispose();
     _inputCtrl.dispose();
     _scrollCtrl.dispose();
@@ -206,6 +212,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     });
     _startDots();
     _scrollBottom();
+
+    // Recarrega preferências antes de gerar para garantir que estão atualizadas
+    await _loadPreferences();
 
     // 1. Verificar se é tema culinário (chamada rápida — só retorna sim/não)
     final isFood = await _gemini.isFoodQuery(msg);

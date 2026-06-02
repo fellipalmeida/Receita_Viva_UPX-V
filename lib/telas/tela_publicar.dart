@@ -247,16 +247,16 @@ class _PublishScreenState extends State<PublishScreen> {
       );
 
       if (widget.isEdit) {
-        await ComunidadeService().editarPost(recipe);
         await StorageService().deleteFromCommunity(recipe.id);
         await StorageService().publishRecipe(recipe);
+        await ComunidadeService().editarPost(recipe);
       } else {
-        await ComunidadeService().publicar(recipe);
+        await StorageService().publishRecipe(recipe);
         await StorageService().addNotification(
           icon: '🍳',
           text: 'Receita "${recipe.title}" publicada na comunidade!',
         );
-        await StorageService().publishRecipe(recipe);
+        await ComunidadeService().publicar(recipe);
       }
 
       if (mounted) {

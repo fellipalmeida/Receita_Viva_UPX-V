@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../tema/tema_app.dart';
 import '../modelos/perfil_usuario.dart';
 import '../servicos/servico_armazenamento.dart';
@@ -16,21 +17,9 @@ class _TelaEditarPerfilState extends State<TelaEditarPerfil> {
   final _storage = StorageService();
   final _nomeCtrl = TextEditingController();
   final _usernameCtrl = TextEditingController();
-  final _bioCtrl = TextEditingController();
-  final _siteCtrl = TextEditingController();
-  List<String> _alergias = [];
   int? _avatarIndex;
   bool _salvando = false;
   UserProfile? _perfilOriginal;
-
-  static const _opcoesAlergias = [
-    {'id': 'gluten', 'label': 'Glúten', 'emoji': '🌾'},
-    {'id': 'lactose', 'label': 'Lactose', 'emoji': '🥛'},
-    {'id': 'amendoim', 'label': 'Amendoim', 'emoji': '🥜'},
-    {'id': 'frutos_mar', 'label': 'Frutos do mar', 'emoji': '🦐'},
-    {'id': 'ovo', 'label': 'Ovos', 'emoji': '🥚'},
-    {'id': 'soja', 'label': 'Soja', 'emoji': '🫘'},
-  ];
 
   @override
   void initState() {
@@ -46,8 +35,6 @@ class _TelaEditarPerfilState extends State<TelaEditarPerfil> {
         _nomeCtrl.text = perfil.name;
         _usernameCtrl.text =
             perfil.email.isNotEmpty ? perfil.email.split('@').first : '';
-        _bioCtrl.text = perfil.bio;
-        _alergias = List<String>.from(perfil.alergias);
         _avatarIndex = perfil.avatarIndex;
       });
     }
@@ -71,8 +58,8 @@ class _TelaEditarPerfilState extends State<TelaEditarPerfil> {
           ? (_perfilOriginal?.name ?? 'Chef')
           : _nomeCtrl.text.trim(),
       email: _perfilOriginal?.email ?? '',
-      bio: _bioCtrl.text.trim(),
-      alergias: _alergias,
+      bio: _perfilOriginal?.bio ?? '',
+      alergias: _perfilOriginal?.alergias ?? [],
       dietas: _perfilOriginal?.dietas ?? [],
       cozinhas: _perfilOriginal?.cozinhas ?? [],
       avatarIndex: _avatarIndex,
@@ -88,9 +75,127 @@ class _TelaEditarPerfilState extends State<TelaEditarPerfil> {
   void dispose() {
     _nomeCtrl.dispose();
     _usernameCtrl.dispose();
-    _bioCtrl.dispose();
-    _siteCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _alterarSenha() async {
+    final senhaAtualCtrl = TextEditingController();
+    final novaSenhaCtrl = TextEditingController();
+    final confirmarCtrl = TextEditingController();
+
+    bool verAtual = false;
+    bool verNova = false;
+    bool verConfirmar = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+              decoration: BoxDecoration(
+                color: context.cardColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36, height: 4,
+                      decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text('Alterar senha',
+                      style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700, color: context.textColor)),
+                  const SizedBox(height: 20),
+                  _SenhaField(label: 'Senha atual', controller: senhaAtualCtrl, mostrar: verAtual,
+                      onToggle: () => setSheet(() => verAtual = !verAtual)),
+                  const SizedBox(height: 14),
+                  _SenhaField(label: 'Nova senha', controller: novaSenhaCtrl, mostrar: verNova,
+                      onToggle: () => setSheet(() => verNova = !verNova)),
+                  const SizedBox(height: 14),
+                  _SenhaField(label: 'Confirmar nova senha', controller: confirmarCtrl, mostrar: verConfirmar,
+                      onToggle: () => setSheet(() => verConfirmar = !verConfirmar)),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity, height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
+                      ),
+                      onPressed: () async {
+                        // erros mostrados dentro do sheet (ctx ainda está ativo)
+                        void snackErro(String msg) {
+                          if (!ctx.mounted) return;
+                          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                            content: Text(msg, style: GoogleFonts.poppins(fontSize: 13)),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ));
+                        }
+
+                        if (senhaAtualCtrl.text.isEmpty) {
+                          snackErro('Informe a senha atual');
+                          return;
+                        }
+                        if (novaSenhaCtrl.text.length < 6) {
+                          snackErro('Nova senha deve ter pelo menos 6 caracteres');
+                          return;
+                        }
+                        if (novaSenhaCtrl.text != confirmarCtrl.text) {
+                          snackErro('Senhas não coincidem');
+                          return;
+                        }
+                        try {
+                          final user = FirebaseAuth.instance.currentUser;
+                          if (user == null) { snackErro('Usuário não autenticado'); return; }
+                          final cred = EmailAuthProvider.credential(
+                            email: user.email!, password: senhaAtualCtrl.text);
+                          await user.reauthenticateWithCredential(cred);
+                          await user.updatePassword(novaSenhaCtrl.text);
+                          // fecha o sheet antes de mostrar o snackbar de sucesso
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text('Senha alterada com sucesso!',
+                                  style: GoogleFonts.poppins(fontSize: 13)),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ));
+                          }
+                        } on FirebaseAuthException catch (e) {
+                          final msg = switch (e.code) {
+                            'wrong-password' || 'invalid-credential' => 'Senha atual incorreta',
+                            'too-many-requests' => 'Muitas tentativas. Aguarde alguns minutos e tente novamente.',
+                            'network-request-failed' => 'Sem conexão. Verifique sua internet.',
+                            _ => 'Erro: ${e.code}',
+                          };
+                          snackErro(msg);
+                        } catch (_) {
+                          snackErro('Erro inesperado. Tente novamente.');
+                        }
+                      },
+                      child: Text('Salvar',
+                          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
   }
 
   String get _iniciais {
@@ -256,123 +361,33 @@ class _TelaEditarPerfilState extends State<TelaEditarPerfil> {
                     _Campo(label: 'Nome', controller: _nomeCtrl),
                     const SizedBox(height: 16),
                     _Campo(label: 'Nome de usuário', controller: _usernameCtrl),
-                    const SizedBox(height: 16),
-                    _Campo(label: 'Bio', controller: _bioCtrl, multiline: true),
-                    const SizedBox(height: 16),
-                    _Campo(label: 'Site', controller: _siteCtrl),
-                    const SizedBox(height: 20),
-                    Divider(color: context.borderColor),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Alergias alimentares',
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: context.textColor,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'O Chef IA usa essas informações para filtrar sugestões',
-                      style: GoogleFonts.poppins(
-                        fontSize: 11,
-                        color: context.mutedColor,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _opcoesAlergias.map((a) {
-                        final ativo = _alergias.contains(a['id']);
-                        return GestureDetector(
-                          onTap: () => setState(() {
-                            if (ativo) {
-                              _alergias.remove(a['id']);
-                            } else {
-                              _alergias.add(a['id']!);
-                            }
-                          }),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              color: ativo ? AppColors.primary : context.chipColor,
-                              borderRadius: BorderRadius.circular(100),
-                              border: ativo
-                                  ? null
-                                  : Border.all(
-                                      color: context.borderColor,
-                                      width: 1.5,
-                                    ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  a['emoji']!,
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  a['label']!,
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 11,
-                                    fontWeight: ativo
-                                        ? FontWeight.w600
-                                        : FontWeight.w400,
-                                    color: ativo
-                                        ? Colors.white
-                                        : context.textColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 20),
-                    Divider(color: context.borderColor),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Zona de perigo',
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: const Color(0xFFEF4444),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      width: double.infinity,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: const Color(0x1AEF4444),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: const Color(0x55EF4444),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
+                    const SizedBox(height: 24),
+                    GestureDetector(
+                      onTap: _alterarSenha,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: context.cardColor,
                           borderRadius: BorderRadius.circular(14),
-                          onTap: () {},
-                          child: Center(
-                            child: Text(
-                              'Excluir conta',
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFFEF4444),
-                              ),
+                          border: Border.all(color: context.borderColor),
+                          boxShadow: const [BoxShadow(color: Color(0x0D000000), blurRadius: 4, offset: Offset(0, 2))],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36, height: 36,
+                              decoration: BoxDecoration(color: context.chipColor, borderRadius: BorderRadius.circular(10)),
+                              alignment: Alignment.center,
+                              child: const Text('🔒', style: TextStyle(fontSize: 18)),
                             ),
-                          ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Text('Alterar senha',
+                                  style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500, color: context.textColor)),
+                            ),
+                            Icon(Icons.chevron_right, color: context.mutedColor, size: 20),
+                          ],
                         ),
                       ),
                     ),
@@ -387,16 +402,46 @@ class _TelaEditarPerfilState extends State<TelaEditarPerfil> {
   }
 }
 
+class _SenhaField extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final bool mostrar;
+  final VoidCallback onToggle;
+
+  const _SenhaField({required this.label, required this.controller, required this.mostrar, required this.onToggle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label.toUpperCase(),
+            style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600,
+                color: context.mutedColor, letterSpacing: 0.8)),
+        const SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          obscureText: !mostrar,
+          style: GoogleFonts.poppins(fontSize: 13, color: context.textColor),
+          decoration: InputDecoration(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+            suffixIcon: GestureDetector(
+              onTap: onToggle,
+              child: Icon(mostrar ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  size: 18, color: context.mutedColor),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _Campo extends StatelessWidget {
   final String label;
   final TextEditingController controller;
-  final bool multiline;
 
-  const _Campo({
-    required this.label,
-    required this.controller,
-    this.multiline = false,
-  });
+  const _Campo({required this.label, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -406,22 +451,16 @@ class _Campo extends StatelessWidget {
         Text(
           label.toUpperCase(),
           style: GoogleFonts.poppins(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: context.mutedColor,
-            letterSpacing: 0.8,
+            fontSize: 11, fontWeight: FontWeight.w600,
+            color: context.mutedColor, letterSpacing: 0.8,
           ),
         ),
         const SizedBox(height: 6),
         TextField(
           controller: controller,
-          maxLines: multiline ? 3 : 1,
           style: GoogleFonts.poppins(fontSize: 13, color: context.textColor),
-          decoration: InputDecoration(
-            contentPadding: EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: multiline ? 12 : 0,
-            ),
+          decoration: const InputDecoration(
+            contentPadding: EdgeInsets.symmetric(horizontal: 14),
           ),
         ),
       ],

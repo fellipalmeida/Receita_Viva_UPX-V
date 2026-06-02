@@ -78,8 +78,17 @@ REGRAS OBRIGATÓRIAS:
     if (alergias.isNotEmpty) {
       restricoes.writeln('\nRESTRIÇÕES OBRIGATÓRIAS: NÃO use nem mencione: ${alergias.join(', ')}. O usuário tem alergia a esses itens.');
     }
-    if (dietas.isNotEmpty) {
-      restricoes.writeln('DIETA DO USUÁRIO: ${dietas.join(', ')}. Adapte todos os ingredientes e preparo.');
+    const dietaDesc = {
+      'vegetariano': 'VEGETARIANO — PROIBIDO usar carne, frango, peixe ou frutos do mar. Substitua obrigatoriamente por alternativas vegetarianas (palmito, grão-de-bico, tofu, cogumelos, berinjela, queijo, ovos, etc).',
+      'vegano': 'VEGANO — PROIBIDO usar qualquer produto animal: carne, frango, peixe, frutos do mar, leite, manteiga, queijo, ovos ou mel. Use apenas ingredientes 100% vegetais.',
+      'low_carb': 'LOW CARB — Evite farinha de trigo, arroz, macarrão, pão, batata e açúcar. Prefira proteínas, gorduras boas e vegetais.',
+      'sem_acucar': 'SEM AÇÚCAR — NÃO use açúcar, mel, açúcar mascavo ou adoçantes calóricos em nenhum ingrediente.',
+      'mediterranea': 'DIETA MEDITERRÂNEA — Use azeite, peixes, leguminosas, grãos integrais e vegetais. Pouca carne vermelha.',
+    };
+    final dietasAtivas = dietas.where((d) => d != 'sem_restricao').toList();
+    if (dietasAtivas.isNotEmpty) {
+      final desc = dietasAtivas.map((d) => dietaDesc[d] ?? d).join('\n');
+      restricoes.writeln('\nDIETA OBRIGATÓRIA DO USUÁRIO:\n$desc\nMESMO que o pedido mencione ingredientes proibidos pela dieta, substitua-os obrigatoriamente por alternativas adequadas. NUNCA inclua ingredientes vetados.');
     }
 
     final prompt = '''Você é um Chef de Cozinha especialista em culinária brasileira e internacional.

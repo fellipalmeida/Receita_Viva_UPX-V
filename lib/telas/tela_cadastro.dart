@@ -20,7 +20,6 @@ class _CadastroScreenState extends State<CadastroScreen> {
 
     final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
-  bool _termos = false;
 
     final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
@@ -81,10 +80,6 @@ class _CadastroScreenState extends State<CadastroScreen> {
     if (_step == 0) {
       if (_nameCtrl.text.trim().isEmpty || _emailCtrl.text.trim().isEmpty) {
         _snack('Preencha nome e e-mail');
-        return;
-      }
-      if (!_termos) {
-        _snack('Aceite os termos de uso para continuar');
         return;
       }
     }
@@ -278,60 +273,6 @@ class _CadastroScreenState extends State<CadastroScreen> {
           placeholder: 'E-mail',
           icon: Icons.email_outlined,
           keyboardType: TextInputType.emailAddress,
-        ),
-        const SizedBox(height: 20),
-        GestureDetector(
-          onTap: () => setState(() => _termos = !_termos),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                width: 18, height: 18,
-                margin: const EdgeInsets.only(top: 2),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(5),
-                  border: Border.all(color: AppColors.primary, width: 2),
-                  color: _termos ? AppColors.primary : Colors.transparent,
-                ),
-                child: _termos
-                    ? const Icon(Icons.check, size: 12, color: Colors.white)
-                    : null,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: RichText(
-                  text: TextSpan(
-                    style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      color: AppColors.textMuted,
-                      height: 1.6,
-                    ),
-                    children: [
-                      const TextSpan(text: 'Concordo com os '),
-                      TextSpan(
-                        text: 'Termos de Uso',
-                        style: GoogleFonts.poppins(
-                          fontSize: 11,
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const TextSpan(text: ' e a '),
-                      TextSpan(
-                        text: 'Política de Privacidade',
-                        style: GoogleFonts.poppins(
-                          fontSize: 11,
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
         ),
       ],
     );

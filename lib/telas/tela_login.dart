@@ -147,17 +147,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: () => setState(() => _showPassword = !_showPassword),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () {},
-                        child: Text(
-                          'Esqueceu a senha?',
-                          style: GoogleFonts.poppins(fontSize: 12, color: AppColors.primary),
-                        ),
-                      ),
-                    ),
                     const SizedBox(height: 16),
                     _GradientButton(label: 'Entrar', onTap: _enter, loading: _loading),
                     const SizedBox(height: 32),
